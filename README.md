@@ -6,15 +6,16 @@ A winter FTP-building app for triathletes. Android, Kotlin + Jetpack Compose.
 
 | Folder | What it is |
 |---|---|
-| `engine/` | **The plan engine.** All the training logic: blocks, weekly templates, workouts, scheduling around swim/run, load maths, .zwo export. Pure Kotlin with no Android code, so it's tested on your PC. |
-| `engine/src/test/` | 42 automated tests that prove the plan follows the rules (max 2 hard days, recovery weeks, progression and so on). |
+| `engine/` | **The plan engine.** All the training logic: blocks, weekly templates, workouts, scheduling around swim/run, load maths, .zwo/.mrc export, .fit reading. Shared by the Android and web apps, so a change to the plan applies to both. |
+| `engine/src/jvmTest/` | 42 automated tests that prove the plan follows the rules (max 2 hard days, recovery weeks, progression and so on). |
 | `app/` | The Android app: screens, local storage and sharing files. |
+| `web/` | **The iPhone web app.** Same plan engine, runs in any phone browser and adds to the Home Screen. No App Store or Mac needed. |
 | `release/` | The APK file to send to testers. |
 
 Key files to read or tweak:
-- `engine/.../WorkoutLibrary.kt`: every workout, and the session length for each hours bucket.
-- `engine/.../Scheduler.kt`: the rules for placing sessions on days, with penalty weights at the top.
-- `engine/.../Load.kt`: Fitness/Fatigue maths, the traffic-light messages, and `MAX_WEEKLY_FITNESS_RISE`.
+- `engine/src/commonMain/.../WorkoutLibrary.kt`: every workout, and the session length for each hours bucket.
+- `engine/src/commonMain/.../Scheduler.kt`: the rules for placing sessions on days, with penalty weights at the top.
+- `engine/src/commonMain/.../Load.kt`: Fitness/Fatigue maths, the traffic-light messages, and `MAX_WEEKLY_FITNESS_RISE`.
 
 ---
 
@@ -50,6 +51,21 @@ Key files to read or tweak:
 
 > To build a new APK after changes: in Android Studio, **Build › Generate App Bundles or APKs › Generate APKs**, or ask Claude to run `gradlew :app:assembleRelease`.
 > Remember to bump `versionCode` and `versionName` in `app/build.gradle.kts` for each release.
+
+### The iPhone web app
+
+iPhone testers use the web version: a link they open in Safari and add to their Home Screen. Same plan, same features, and nothing is uploaded: data stays on their phone.
+
+**Putting it online (one-off setup, about 10 minutes):**
+1. Create a free **personal** GitHub account at github.com (not a work one). Use a personal email.
+2. Tell Claude your GitHub username. Claude creates the repository, uploads the code and switches on GitHub Pages.
+3. The app goes live at `https://<your-username>.github.io/offseason/`, and it updates automatically every time a change is saved.
+
+**Telling iPhone testers:** send them the link and say "Open it in Safari, tap Share › Add to Home Screen, then open Off-Season from the new icon." The app has the same steps under Settings › How-to guides.
+
+**Trying it on this PC:** `gradlew :web:jsBrowserDevelopmentRun` opens it in your browser.
+
+**Moving between versions:** Settings › Export on one, then Settings › Import on the other. The file format is the same on Android and web.
 
 ### Running the tests
 In Android Studio, right-click the `engine` folder and choose **Run 'Tests in engine'**. Green = good.

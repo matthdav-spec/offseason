@@ -11,8 +11,9 @@ kotlin {
         compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
     }
     js {
-        browser()
-        nodejs()
+        // The engine's tests run on the PC (jvmTest). No browser test runner needed, which avoids
+        // pulling in Karma (fetched from GitHub, which npm on this PC rightly refuses).
+        browser { testTask { enabled = false } }
     }
 
     sourceSets {

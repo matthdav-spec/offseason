@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Off-Season</title>
+    <meta name="description" content="A winter FTP-building plan for triathletes.">
+    <meta name="theme-color" content="#0E1A24">
+
+    <!-- Lets iPhone users "Add to Home Screen" and open it like an app, full screen. -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Off-Season">
+    <link rel="apple-touch-icon" href="icon-180.png">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <link rel="manifest" href="manifest.webmanifest">
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="root"></div>
+<noscript>Off-Season needs JavaScript turned on.</noscript>
+<script src="offseason.js"></script>
+<script>
+    // Works offline after the first visit.
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    }
+</script>
+</body>
+</html>

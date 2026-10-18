@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 rootProject.name = "OffSeason"
 include(":engine")
 include(":app")
+include(":web")
