@@ -1,0 +1,312 @@
+package com.offseason.app.ui
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import com.offseason.app.data.Experience
+import com.offseason.app.data.Profile
+import com.offseason.engine.Expectations
+import com.offseason.engine.PlanGenerator
+import com.offseason.engine.PlanLength
+import com.offseason.engine.RecoveryCycle
+import java.time.DayOfWeek
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.temporal.TemporalAdjusters
+
+val READINESS_QUESTIONS = listOf(
+    "heart" to "Has a doctor ever said you have a heart condition, or that you should only exercise under medical supervision?",
+    "chest" to "Do you get chest pain, or feel faint or dizzy, when you exercise?",
+    "bp" to "Do you have high blood pressure or any other condition that isn't well controlled?",
+    "injury" to "Do you have a bone, joint or muscle problem that hard exercise could make worse?",
+    "other" to "Is there any other reason (including pregnancy) you shouldn't do hard exercise?",
+)
+
+const val DISCLAIMER =
+    "Off-Season gives general training guidance, not medical advice. Hard interval sessions and FTP tests put real " +
+        "strain on your heart and body. If you have any health concerns, or answer \"yes\" to any question below, " +
+        "speak to your GP before starting. Stop any session straight away if you feel unwell, dizzy or get chest pain. " +
+        "You take part at your own risk."
+
+/** First-run setup: welcome → safety → about you → your week → your plan. */
+@Composable
+fun OnboardingScreen(
+    onFinish: (Profile, ftp: Int?) -> Unit,
+    today: LocalDate,
+) {
+    var page by rememberSaveable { mutableIntStateOf(0) }
+    val pages = 5
+
+    // Form state
+    var name by rememberSaveable { mutableStateOf("") }
+    var experience by rememberSaveable { mutableStateOf(Experience.NEWER) }
+    var ftpText by rememberSaveable { mutableStateOf("") }
+    var needsTest by rememberSaveable { mutableStateOf(false) }
+    var accepted by rememberSaveable { mutableStateOf(false) }
+    val readiness = remember { mutableStateMapOf<String, Boolean>() }
+    var hours by rememberSaveable { mutableIntStateOf(4) }
+    var bikeDays by remember { mutableStateOf(setOf(DayOfWeek.TUESDAY, DayOfWeek.THURSDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)) }
+    var swimDays by remember { mutableStateOf(setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY)) }
+    var runDays by remember { mutableStateOf(setOf(DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY, DayOfWeek.SUNDAY)) }
+    var longRun by remember { mutableStateOf<DayOfWeek?>(DayOfWeek.SUNDAY) }
+    var hardRuns by remember { mutableStateOf(setOf(DayOfWeek.WEDNESDAY)) }
+    var weeks by rememberSaveable { mutableIntStateOf(12) }
+    var cycle by rememberSaveable { mutableStateOf(RecoveryCycle.THREE_ONE) }
+    var startDate by remember { mutableStateOf(today.with(TemporalAdjusters.next(DayOfWeek.MONDAY))) }
+
+    val ftp = ftpText.toIntOrNull()
+    val canContinue = when (page) {
+        1 -> accepted && READINESS_QUESTIONS.all { it.first in readiness }
+        2 -> name.isNotBlank() && (needsTest || (ftp != null && ftp in 50..600))
+        3 -> bikeDays.isNotEmpty()
+        else -> true
+    }
+
+    Column(Modifier.fillMaxSize().systemBarsPadding().imePadding()) {
+        LinearProgressIndicator(progress = { (page + 1f) / pages }, modifier = Modifier.fillMaxWidth())
+        Column(
+            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            when (page) {
+                0 -> WelcomePage()
+                1 -> SafetyPage(accepted, { accepted = it }, readiness)
+                2 -> AboutYouPage(name, { name = it }, experience, { experience = it }, ftpText, { ftpText = it.filter(Char::isDigit).take(3) }, needsTest, { needsTest = it })
+                3 -> WeekPage(
+                    hours, { hours = it }, bikeDays, { bikeDays = it }, swimDays, { swimDays = it },
+                    runDays, { runDays = it; if (longRun !in it) longRun = null; hardRuns = hardRuns intersect it },
+                    longRun, { longRun = it }, hardRuns, { hardRuns = it },
+                )
+                4 -> PlanPage(weeks, { weeks = it }, cycle, { cycle = it }, startDate, { startDate = it }, today)
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (page > 0) OutlinedButton(onClick = { page-- }, Modifier.weight(1f)) { Text("Back") }
+            Button(
+                enabled = canContinue,
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    if (page < pages - 1) page++
+                    else onFinish(
+                        Profile(
+                            name = name.trim(),
+                            experience = experience,
+                            hoursPerWeek = hours,
+                            bikeDays = bikeDays.map { it.value }.sorted(),
+                            swimDays = swimDays.map { it.value }.sorted(),
+                            runDays = runDays.map { it.value }.sorted(),
+                            longRunDay = longRun?.value,
+                            hardRunDays = hardRuns.map { it.value }.sorted(),
+                            planWeeks = weeks,
+                            startDate = startDate.toString(),
+                            recoveryCycle = cycle.name,
+                            disclaimerAcceptedOn = today.toString(),
+                            readiness = readiness.toMap(),
+                        ),
+                        if (needsTest) null else ftp,
+                    )
+                },
+            ) { Text(if (page < pages - 1) "Continue" else "Build my plan") }
+        }
+    }
+}
+
+@Composable
+private fun WelcomePage() {
+    Text("Off-Season", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+    Text("Turn this winter into a stronger bike.", style = MaterialTheme.typography.titleLarge)
+    Text(
+        "A structured indoor plan to raise your FTP (the power you can hold for about an hour) on just 3–5 hours " +
+            "a week, built around your swimming and running.",
+    )
+    SectionCard {
+        Text("How it works", fontWeight = FontWeight.SemiBold)
+        Text("1. Do an FTP test (or enter a recent result).")
+        Text("2. Tell us your hours and which days you swim, run and ride.")
+        Text("3. Get a plan with exact watt targets. Download sessions for Zwift, MyWhoosh or TrainingPeaks Virtual.")
+        Text("4. Retest every 4 weeks. Your targets update automatically.")
+    }
+    SectionCard {
+        Text("What to expect", fontWeight = FontWeight.SemiBold)
+        Text(Expectations.NEWER_RIDER)
+        Text(Expectations.EXPERIENCED)
+        Muted("Consistency beats heroics: hitting most of your sessions matters more than smashing any single one.")
+    }
+}
+
+@Composable
+private fun SafetyPage(accepted: Boolean, onAccept: (Boolean) -> Unit, answers: MutableMap<String, Boolean>) {
+    Text("Before you start", style = MaterialTheme.typography.headlineSmall)
+    SectionCard { Text(DISCLAIMER, style = MaterialTheme.typography.bodyMedium) }
+    Text("Quick readiness check", style = MaterialTheme.typography.titleMedium)
+    READINESS_QUESTIONS.forEach { (key, q) ->
+        SectionCard {
+            Text(q, style = MaterialTheme.typography.bodyMedium)
+            ChoiceChips(listOf("No" to (answers[key] == false), "Yes" to (answers[key] == true))) { answers[key] = it == 1 }
+        }
+    }
+    if (answers.values.any { it }) {
+        SectionCard {
+            Text(
+                "You answered yes to at least one question. Please check with your GP before doing the FTP test or hard " +
+                    "intervals. You can still set up your plan.",
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(accepted, onAccept)
+        Text("I've read and accept this")
+    }
+}
+
+@Composable
+private fun AboutYouPage(
+    name: String, onName: (String) -> Unit,
+    exp: Experience, onExp: (Experience) -> Unit,
+    ftpText: String, onFtp: (String) -> Unit,
+    needsTest: Boolean, onNeedsTest: (Boolean) -> Unit,
+) {
+    Text("About you", style = MaterialTheme.typography.headlineSmall)
+    OutlinedTextField(name, onName, label = { Text("First name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    Text("Cycling experience", style = MaterialTheme.typography.titleSmall)
+    ChoiceChips(listOf("Fairly new to structured training" to (exp == Experience.NEWER), "Experienced" to (exp == Experience.EXPERIENCED))) {
+        onExp(if (it == 0) Experience.NEWER else Experience.EXPERIENCED)
+    }
+    Spacer(Modifier.padding(4.dp))
+    Text("Your FTP", style = MaterialTheme.typography.titleSmall)
+    Muted("Functional Threshold Power: the highest power you can hold for about an hour, in watts.")
+    OutlinedTextField(
+        ftpText, onFtp, enabled = !needsTest, label = { Text("FTP (watts)") }, singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(),
+    )
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(needsTest, onNeedsTest)
+        Text("I don't know it. I need to test first.")
+    }
+    if (needsTest) Muted("No problem. We'll guide you through a 20-minute FTP test as your first session.")
+}
+
+@Composable
+private fun WeekPage(
+    hours: Int, onHours: (Int) -> Unit,
+    bike: Set<DayOfWeek>, onBike: (Set<DayOfWeek>) -> Unit,
+    swim: Set<DayOfWeek>, onSwim: (Set<DayOfWeek>) -> Unit,
+    run: Set<DayOfWeek>, onRun: (Set<DayOfWeek>) -> Unit,
+    longRun: DayOfWeek?, onLongRun: (DayOfWeek?) -> Unit,
+    hardRuns: Set<DayOfWeek>, onHardRuns: (Set<DayOfWeek>) -> Unit,
+) {
+    val needed = if (hours == 3) 3 else 4
+    Text("Your week", style = MaterialTheme.typography.headlineSmall)
+    Text("Bike hours per week", style = MaterialTheme.typography.titleSmall)
+    ChoiceChips(listOf(3, 4, 5).map { "$it hours" to (hours == it) }) { onHours(it + 3) }
+    Muted(
+        when (hours) {
+            3 -> "Two 60-min interval sessions + one 60-min steady ride."
+            4 -> "Two 60-min interval sessions, a 90-min endurance ride, and an optional 30-min easy spin."
+            else -> "Two 70-min interval sessions, a 2-hour endurance ride and a 45-min cadence session."
+        },
+    )
+    Text("Which days can you ride?", style = MaterialTheme.typography.titleSmall)
+    DayPicker(bike, onBike)
+    if (bike.size < needed) Muted("Pick $needed days for the full plan. With fewer, we'll keep the most important sessions.")
+    Text("Which days do you swim?", style = MaterialTheme.typography.titleSmall)
+    DayPicker(swim, onSwim)
+    Text("Which days do you run?", style = MaterialTheme.typography.titleSmall)
+    DayPicker(run, onRun)
+    if (run.isNotEmpty()) {
+        Text("Long run day", style = MaterialTheme.typography.titleSmall)
+        val runList = run.sorted()
+        ChoiceChips(listOf("None" to (longRun == null)) + runList.map { it.short() to (it == longRun) }) {
+            onLongRun(if (it == 0) null else runList[it - 1])
+        }
+        Text("Hard run sessions (intervals, tempo)", style = MaterialTheme.typography.titleSmall)
+        DayPicker(hardRuns, onHardRuns, enabled = { it in run })
+        Muted("We'll try to keep hard bike sessions away from your long and hard runs, so you're fresh for each.")
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlanPage(
+    weeks: Int, onWeeks: (Int) -> Unit,
+    cycle: RecoveryCycle, onCycle: (RecoveryCycle) -> Unit,
+    start: LocalDate, onStart: (LocalDate) -> Unit,
+    today: LocalDate,
+) {
+    var picking by remember { mutableStateOf(false) }
+    Text("Your plan", style = MaterialTheme.typography.headlineSmall)
+    Text("How long?", style = MaterialTheme.typography.titleSmall)
+    ChoiceChips(listOf(4, 8, 12, 16).map { "$it weeks" to (weeks == it) }) { onWeeks((it + 1) * 4) }
+    Muted(
+        when (weeks) {
+            4 -> "One block: sweet spot."
+            8 -> "Sweet spot, then threshold."
+            12 -> "Sweet spot, threshold, then VO2max."
+            else -> "Sweet spot, threshold, VO2max, then race-specific work."
+        } + " Each block ends with a recovery week and an FTP retest.",
+    )
+    Text("Recovery rhythm", style = MaterialTheme.typography.titleSmall)
+    ChoiceChips(
+        listOf("3 weeks on, 1 easy (standard)" to (cycle == RecoveryCycle.THREE_ONE), "2 on, 1 easy (recover slower)" to (cycle == RecoveryCycle.TWO_ONE)),
+    ) { onCycle(RecoveryCycle.entries[it]) }
+    if (cycle == RecoveryCycle.TWO_ONE) {
+        Muted("Your plan will be ${PlanGenerator.totalWeeks(PlanLength.ofWeeks(weeks), cycle)} weeks: 3-week blocks with more frequent recovery.")
+    }
+    Text("Start date", style = MaterialTheme.typography.titleSmall)
+    OutlinedButton(onClick = { picking = true }) { Text(start.format(DateTimeFormatter.ofPattern("EEEE d MMMM yyyy"))) }
+    Muted("Weeks run from this day. A Monday start is usually easiest.")
+
+    if (picking) {
+        val state = rememberDatePickerState(
+            initialSelectedDateMillis = start.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+        )
+        DatePickerDialog(
+            onDismissRequest = { picking = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { onStart(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()) }
+                    picking = false
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { picking = false }) { Text("Cancel") } },
+        ) { DatePicker(state) }
+    }
+    if (start.isBefore(today)) Muted("That date is in the past. The plan will start part-way through.")
+}
