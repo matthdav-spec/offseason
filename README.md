@@ -43,7 +43,7 @@ Key files to read or tweak:
 4. Your phone appears in Android Studio's device dropdown. Pick it and press **▶ Run**.
 
 ### Sending it to testers (sideloading)
-1. Send `release\OffSeason-0.1.0.apk` to the WhatsApp group, or put it on Google Drive and share the link.
+1. Send `release\OffSeason-0.2.0.apk` to the WhatsApp group, or put it on Google Drive and share the link.
 2. Testers tap the file. Android asks them to **allow installs from this source** (WhatsApp, Drive or Files). They allow it once, then tap **Install**.
 3. Play Protect may warn that it's from an unknown developer. Tap **More details › Install anyway**. That's expected for an app not in the Play Store.
 4. To update: send a new APK. Installing over the top keeps their data.

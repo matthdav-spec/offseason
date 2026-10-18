@@ -3,6 +3,7 @@ package com.offseason.app
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
+import com.offseason.engine.MrcExporter
 import com.offseason.engine.PlanWeek
 import com.offseason.engine.Workout
 import com.offseason.engine.ZwoExporter
@@ -11,11 +12,14 @@ import java.io.File
 /**
  * Sends workout files out of the app through Android's share sheet: email to yourself,
  * save to Google Drive/Files, send over WhatsApp, etc. From there you copy them into
- * Zwift / MyWhoosh / TrainingPeaks Virtual's workouts folder.
+ * Zwift / MyWhoosh (.zwo) or ROUVY / TrainingPeaks Virtual (.mrc).
  */
 object Sharing {
     fun shareWorkout(context: Context, workout: Workout) =
         shareFile(context, ZwoExporter.fileName(workout), ZwoExporter.toZwo(workout).toByteArray(), "application/xml")
+
+    fun shareWorkoutMrc(context: Context, workout: Workout) =
+        shareFile(context, MrcExporter.fileName(ZwoExporter.fileName(workout)), MrcExporter.toMrc(workout).toByteArray(), "text/plain")
 
     fun shareWeek(context: Context, week: PlanWeek) =
         shareFile(context, ZwoExporter.weekBundleName(week), ZwoExporter.weekBundle(week), "application/zip")

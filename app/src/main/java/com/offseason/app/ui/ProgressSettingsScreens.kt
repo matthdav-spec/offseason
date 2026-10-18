@@ -137,7 +137,7 @@ fun SettingsScreen(
     onExport: () -> Unit,
     onImport: () -> Unit,
     onReset: () -> Unit,
-    onHelp: () -> Unit,
+    onHelp: (route: String) -> Unit,
 ) {
     val p = data.profile ?: return
     var hours by remember(p) { mutableStateOf(p.hoursPerWeek) }
@@ -164,7 +164,12 @@ fun SettingsScreen(
 
     Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        OutlinedButton(onClick = onHelp, Modifier.fillMaxWidth()) { Text("How to load sessions into Zwift / MyWhoosh / TPV") }
+        SectionCard {
+            Text("How-to guides", fontWeight = FontWeight.SemiBold)
+            OutlinedButton(onClick = { onHelp("help/trainer") }, Modifier.fillMaxWidth()) { Text("Get sessions into Zwift, MyWhoosh, ROUVY or TPV") }
+            OutlinedButton(onClick = { onHelp("help/feel") }, Modifier.fillMaxWidth()) { Text("Rating sessions & easing off") }
+            OutlinedButton(onClick = { onHelp("help/fit") }, Modifier.fillMaxWidth()) { Text("Adding your ride files (.fit)") }
+        }
 
         SectionCard {
             Text("FTP", fontWeight = FontWeight.SemiBold)
@@ -182,7 +187,11 @@ fun SettingsScreen(
         }
 
         SectionCard {
-            Text("Your week", fontWeight = FontWeight.SemiBold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Your week", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Button(enabled = edited != p && bike.isNotEmpty(), onClick = { onSaveProfile(edited) }) { Text("Save changes") }
+            }
+            Muted("Change anything below, then tap Save changes. Your plan is rebuilt, and sessions you've done stay done.")
             ChoiceChips(listOf(3, 4, 5).map { "$it h" to (hours == it) }) { hours = it + 3 }
             Text("Bike days"); DayPicker(bike, { bike = it })
             Text("Swim days"); DayPicker(swim, { swim = it })
@@ -195,8 +204,7 @@ fun SettingsScreen(
                 }
                 Text("Hard runs"); DayPicker(hard, { hard = it }, enabled = { it in run })
             }
-            Button(enabled = edited != p && bike.isNotEmpty(), onClick = { onSaveProfile(edited) }) { Text("Save and rebuild plan") }
-            Muted("Your plan is rebuilt from these settings. Sessions you've already marked done stay done.")
+            Button(enabled = edited != p && bike.isNotEmpty(), onClick = { onSaveProfile(edited) }, modifier = Modifier.fillMaxWidth()) { Text("Save changes") }
         }
 
         SectionCard {
@@ -240,13 +248,13 @@ fun SettingsScreen(
 }
 
 @Composable
-fun HelpScreen() {
+fun TrainerHelpScreen() {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Getting sessions onto your trainer", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text("Off-Season creates workout files in two formats: .zwo for Zwift and MyWhoosh, and .mrc for ROUVY and TrainingPeaks Virtual. Targets are a percentage of FTP, so the watts scale to the FTP set in that app. Keep your FTP the same in both places.")
         SectionCard {
             Text("1. Get the files to your trainer computer", fontWeight = FontWeight.SemiBold)
-            Text("Tap \"Week's sessions\" on the This Week screen, then email the zip to yourself or save it to Google Drive. Open it on the PC, Mac or tablet you ride with, and unzip it.")
+            Text("For the whole week: tap \"Week's sessions\" on the This Week screen. For one session: open it and tap the button for your app. Email the file to yourself or save it to Google Drive, then open it on the PC, Mac or tablet you ride with. Unzip the week's zip first.")
         }
         SectionCard {
             Text("2a. Zwift", fontWeight = FontWeight.SemiBold)
@@ -265,6 +273,63 @@ fun HelpScreen() {
             Text("Go to Workouts › Import, and pick the .mrc file.")
         }
         Muted("The week's zip has every session as both .zwo and .mrc. Use whichever your app needs. For FTP tests, use the .zwo or turn ERG mode off: .mrc can't do a \"ride as hard as you can\" effort.")
-        Muted("On a tablet or phone running Zwift, the easiest route is to use a computer once, or wait for Intervals.icu sync in a future version.")
+        Muted("Riding Zwift on an iPad or Apple TV? Zwift only reads custom workouts from a computer's Workouts folder. Copy them across on a PC or Mac once, and they sync to your other devices on the same Zwift account.")
+    }
+}
+
+@Composable
+fun FeelHelpScreen() {
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Rating sessions & easing off", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text("After each ride, open the session and tap Mark done. Then pick how it felt. This is how Off-Season knows whether the plan suits you.")
+        SectionCard {
+            Text("What to pick", fontWeight = FontWeight.SemiBold)
+            Text("Easy: you could have done more.")
+            Text("About right: hard where it should be, but you finished strong.")
+            Text("Hard: you got through it, but it was a real struggle.")
+            Text("Couldn't finish: you had to stop early or cut the intervals short.")
+            Muted("Change your mind? Open the session and tap Change.")
+        }
+        SectionCard {
+            Text("When sessions keep feeling too hard", fontWeight = FontWeight.SemiBold)
+            Text("If two interval sessions in a row are rated Hard or Couldn't finish, Off-Season offers three choices:")
+            Text("• Lower my targets: every session from tomorrow is ${com.offseason.engine.Adaptation.EASE_PCT}% easier. This lasts until your next FTP test, which sets new targets anyway.")
+            Text("• Repeat this week: do this week again before moving on. The rest of the plan, including retests, moves back a week.")
+            Text("• No thanks: carry on as planned. Sometimes a hard week is just a hard week.")
+            Muted("A bad night's sleep or a big run can make any session feel hard. If it keeps happening, easing off is the smart choice, not a failure.")
+        }
+        SectionCard {
+            Text("Updating your trainer app", fontWeight = FontWeight.SemiBold)
+            Text("If you lower your targets, download the sessions again so your trainer app gets the new targets.")
+        }
+    }
+}
+
+@Composable
+fun FitHelpScreen() {
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Adding your ride files (.fit)", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text("This is optional. Every app you ride with saves a .fit file of your ride. Give it to Off-Season and it reads your real power, so your progress and fitness trend are based on what you actually did, not just the plan.")
+        SectionCard {
+            Text("Two ways to add one", fontWeight = FontWeight.SemiBold)
+            Text("1. Open the session in Off-Season and tap \"Add ride file (.fit)\". Then pick the file from your phone, Google Drive or Downloads.")
+            Text("2. Or find the file in another app (email, WhatsApp, Files or Drive), tap Share, and choose Off-Season. It suggests which session the ride belongs to.")
+            Muted("Zip files from Garmin Connect work too. No need to unzip.")
+        }
+        SectionCard {
+            Text("Where to find your .fit file", fontWeight = FontWeight.SemiBold)
+            Text("Zwift: on your PC or Mac, Documents › Zwift › Activities. Or on zwift.com: your profile › Activities › pick the ride › Download.")
+            Text("MyWhoosh: on the MyWhoosh website, open your activities, pick the ride and download the .fit file.")
+            Text("ROUVY: on the ROUVY website, open your activity history, pick the ride and export or download the .fit file.")
+            Text("TrainingPeaks Virtual: rides upload to TrainingPeaks. On the TrainingPeaks website, open the workout, then Files › download the .fit.")
+            Text("Garmin Connect: open the activity, tap the cog › Export Original.")
+            Text("Strava (your own rides): open the activity on the website, then ⋯ › Export Original.")
+            Muted("Menu names change from time to time. If something doesn't match, look for \"Export\" or \"Download\" on the ride.")
+        }
+        SectionCard {
+            Text("What you'll see", fontWeight = FontWeight.SemiBold)
+            Text("The session is marked done, with your time, average and weighted power, and whether you hit the planned effort. For an FTP test, it finds your best 20 minutes and works out your new FTP for you.")
+            Muted("If the file has no power data (e.g. a ride without a power meter), the session still counts, using the planned effort.")
+        }
     }
 }

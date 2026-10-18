@@ -106,7 +106,7 @@ fun WorkoutProfile(workout: Workout, modifier: Modifier = Modifier, heightDp: In
         fun y(pct: Double) = size.height - (pct / maxPct * size.height).toFloat()
         for ((dur, from, to) in segs) {
             val w = dur * pxPerSec
-            val color = AppColors.zone(Zone.of((from + to) / 2))
+            val color = AppColors.zone(Zone.of((from + to) / 2 / workout.targetScale))
             if (from == to) {
                 drawRect(color, Offset(x, y(from)), Size(w, size.height - y(from)))
             } else {

@@ -24,6 +24,12 @@ data class AppData(
     val ftpHistory: List<FtpEntry> = emptyList(),
     /** Keyed by PlannedSession.id. */
     val completions: Map<String, Completion> = emptyMap(),
+    /** Target changes the athlete accepted, e.g. "lower by 4%" from a date. Cleared at each retest. */
+    val targetAdjustments: List<TargetAdjustment> = emptyList(),
+    /** Original week indexes the athlete chose to repeat, in order. */
+    val repeatedWeeks: List<Int> = emptyList(),
+    /** Session ids where the athlete said "no thanks" to easing, so we don't keep asking. */
+    val easingDeclinedAt: List<String> = emptyList(),
 ) {
     val currentFtp: Int? get() = ftpHistory.maxByOrNull { it.date }?.ftp
     val startingFtp: Int? get() = ftpHistory.minByOrNull { it.date }?.ftp
@@ -75,7 +81,32 @@ enum class Rpe(val label: String) {
 }
 
 @Serializable
-data class Completion(val date: String, val rpe: Rpe)
+data class Completion(
+    val date: String,
+    val rpe: Rpe,
+    /** Present if the athlete added a .fit ride file. */
+    val ride: RideStats? = null,
+)
+
+/** What we keep from a .fit file. The file itself isn't stored. */
+@Serializable
+data class RideStats(
+    val durationSec: Int,
+    val avgPower: Int? = null,
+    val weightedPower: Int? = null,
+    val best20MinPower: Int? = null,
+    /** FTP at the time, so the load stays correct if FTP changes later. */
+    val ftpAtRide: Int? = null,
+    val sessionLoad: Double? = null,
+)
+
+@Serializable
+data class TargetAdjustment(
+    /** ISO date the change applies from. */
+    val fromDate: String,
+    /** e.g. -4 for "4% lower". */
+    val pct: Int,
+)
 
 /** Reads and writes [AppData] as a JSON file in the app's private storage. */
 class Store(context: Context) {

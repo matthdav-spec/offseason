@@ -14,6 +14,9 @@ kotlin {
 }
 
 dependencies {
+    // Garmin's official FIT SDK: reads and writes .fit ride files. Plain Java, so it works on Android too.
+    implementation(libs.garmin.fit)
+
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.launcher)

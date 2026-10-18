@@ -11,8 +11,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -56,7 +58,7 @@ private fun wattRange(low: Int, high: Int?, ftp: Int?) =
 private fun dur(sec: Int) = if (sec % 60 == 0) "${sec / 60} min" else "${sec / 60}:${"%02d".format(sec % 60)}"
 
 /** A step as (title, watts, small % text). */
-fun describe(step: Step, ftp: Int?): Triple<String, String, String> {
+fun describe(step: Step, ftp: Int?, zone: Zone = Zone.of(step.targetPct)): Triple<String, String, String> {
     val cad = step.cadenceTarget?.let { " · $it rpm" } ?: ""
     val pct = pctRange(step.powerPctLow, step.powerPctHigh)
     return when (step.type) {
@@ -66,12 +68,12 @@ fun describe(step: Step, ftp: Int?): Triple<String, String, String> {
         StepType.STEADY -> Triple(
             (step.label?.let { "$it · " } ?: "") + "${dur(step.durationSec)} steady",
             wattRange(step.powerPctLow, step.powerPctHigh, ftp),
-            "$pct FTP · ${Zone.of(step.targetPct).displayName}$cad",
+            "$pct FTP · ${zone.displayName}$cad",
         )
         StepType.INTERVALS -> Triple(
             (step.label?.let { "$it · " } ?: "") + "${step.repeat} × ${dur(step.durationSec)} on / ${dur(step.offDurationSec!!)} easy",
             wattRange(step.powerPctLow, step.powerPctHigh, ftp) + " / " + watts(step.offPowerPct!!, ftp),
-            "$pct FTP · ${Zone.of(step.targetPct).displayName}$cad",
+            "$pct FTP · ${zone.displayName}$cad",
         )
         StepType.FREE_RIDE -> Triple(step.label ?: "Free ride ${dur(step.durationSec)}", "Max effort", "No target. Ride by feel$cad")
     }
@@ -80,9 +82,10 @@ fun describe(step: Step, ftp: Int?): Triple<String, String, String> {
 @Composable
 fun StepList(workout: Workout, ftp: Int?) {
     workout.steps.forEach { step ->
-        val (title, w, small) = describe(step, ftp)
+        val zone = workout.plannedZone(step)
+        val (title, w, small) = describe(step, ftp, zone)
         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Dot(AppColors.zone(Zone.of(step.targetPct)))
+            Dot(AppColors.zone(zone))
             Column(Modifier.weight(1f).padding(start = 10.dp)) {
                 Text(title, style = MaterialTheme.typography.bodyMedium)
                 Muted(small)
@@ -97,10 +100,18 @@ fun StepList(workout: Workout, ftp: Int?) {
 fun SessionDetailScreen(
     session: PlannedSession,
     data: AppData,
-    onDownload: (Workout) -> Unit,
+    onDownloadZwo: (Workout) -> Unit,
+    onDownloadMrc: (Workout) -> Unit,
     onMarkDone: (Rpe) -> Unit,
     onUndo: () -> Unit,
     onRetest: () -> Unit,
+    onAddRideFile: () -> Unit,
+    /** After a rating: true if we should offer to lower targets or repeat the week. */
+    offerEasing: Boolean,
+    canRepeatWeek: Boolean,
+    onLowerTargets: () -> Unit,
+    onRepeatWeek: () -> Unit,
+    onDeclineEasing: () -> Unit,
 ) {
     val ftp = data.currentFtp
     val w = session.workout
@@ -116,19 +127,39 @@ fun SessionDetailScreen(
             Muted("Bar height = power. Dashed line = your FTP${ftp?.let { " ($it W)" } ?: ""}.")
         }
         SectionCard { StepList(w, ftp) }
-        OutlinedButton(onClick = { onDownload(w) }, Modifier.fillMaxWidth()) {
-            Icon(Icons.Default.Download, null); Text("  Download .zwo")
+
+        SectionCard {
+            Text("Download for your trainer app", fontWeight = FontWeight.SemiBold)
+            OutlinedButton(onClick = { onDownloadZwo(w) }, Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Download, null); Text("  Zwift / MyWhoosh (.zwo)")
+            }
+            OutlinedButton(onClick = { onDownloadMrc(w) }, Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Download, null); Text("  ROUVY / TPV (.mrc)")
+            }
+            Muted("Not sure how? Settings › How-to guides.")
         }
+
         when {
             done != null -> SectionCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Check, null, tint = AppColors.done)
                     Text("  Done · felt ${done.rpe.label.lowercase()}", Modifier.weight(1f))
+                    TextButton(onClick = { askRpe = true }) { Text("Change") }
                     TextButton(onClick = onUndo) { Text("Undo") }
                 }
+                done.ride?.let { RideResult(it, w, ftp) }
             }
             w.kind == SessionKind.FTP_TEST -> Button(onClick = onRetest, Modifier.fillMaxWidth()) { Text("Enter my test result") }
             else -> Button(onClick = { askRpe = true }, Modifier.fillMaxWidth()) { Text("Mark done") }
+        }
+
+        if (offerEasing && done != null) EasingOffer(canRepeatWeek, onLowerTargets, onRepeatWeek, onDeclineEasing)
+
+        if (done?.ride == null) {
+            OutlinedButton(onClick = onAddRideFile, Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.UploadFile, null); Text("  Add ride file (.fit). Optional")
+            }
+            Muted("Adding the .fit file from your ride gives Off-Season your real power, so your progress is more accurate. You don't have to: \"Mark done\" is fine too.")
         }
     }
     if (askRpe) {
@@ -140,6 +171,7 @@ fun SessionDetailScreen(
                     Rpe.entries.forEach { r ->
                         OutlinedButton(onClick = { onMarkDone(r); askRpe = false }, Modifier.fillMaxWidth()) { Text(r.label) }
                     }
+                    Muted("Be honest! If sessions keep feeling too hard, Off-Season will offer to ease off.")
                 }
             },
             confirmButton = {},
@@ -148,18 +180,64 @@ fun SessionDetailScreen(
     }
 }
 
+@Composable
+private fun RideResult(ride: com.offseason.app.data.RideStats, w: Workout, ftp: Int?) {
+    HorizontalDivider()
+    Text("From your ride file", fontWeight = FontWeight.SemiBold)
+    Text("${minutesLabel(ride.durationSec / 60)} ridden (planned ${minutesLabel(w.durationMin)})")
+    if (ride.avgPower == null) {
+        Muted("No power in this file, so we've counted it as the planned session.")
+        return
+    }
+    Text("Average ${ride.avgPower} W · Weighted ${ride.weightedPower} W")
+    val rideFtp = ride.ftpAtRide ?: ftp
+    if (rideFtp != null && ride.weightedPower != null && w.kind != SessionKind.FTP_TEST) {
+        val planned = com.offseason.engine.Load.effortScore(w) * rideFtp
+        val pct = ride.weightedPower * 100.0 / planned
+        Muted(
+            when {
+                pct >= 97 -> "Right on target. Nicely done."
+                pct >= 90 -> "A little under the planned effort (${pct.toInt()}%). Fine for a hard day."
+                else -> "Quite a bit under the planned effort (${pct.toInt()}%). If that keeps happening, your targets may be too high."
+            },
+        )
+    }
+    ride.best20MinPower?.takeIf { w.kind == SessionKind.FTP_TEST }?.let {
+        Text("Best 20 minutes: $it W → FTP ${Ftp.from20MinTest(it)} W", color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+@Composable
+private fun EasingOffer(canRepeatWeek: Boolean, onLower: () -> Unit, onRepeat: () -> Unit, onDecline: () -> Unit) {
+    SectionCard {
+        Text("Sessions feeling too hard?", fontWeight = FontWeight.SemiBold)
+        Text(
+            "Your last couple of interval sessions felt hard. That can mean your FTP is set a bit high, or you're carrying " +
+                "fatigue from swimming, running or life. Easing off now beats burning out in January.",
+        )
+        Button(onClick = onLower, Modifier.fillMaxWidth()) { Text("Lower my targets by ${com.offseason.engine.Adaptation.EASE_PCT}%") }
+        if (canRepeatWeek) OutlinedButton(onClick = onRepeat, Modifier.fillMaxWidth()) { Text("Repeat this week") }
+        TextButton(onClick = onDecline, Modifier.fillMaxWidth()) { Text("No thanks, keep going") }
+        Muted("Lowering targets lasts until your next FTP test. Repeating the week pushes the rest of the plan back by a week.")
+    }
+}
+
 /** Screen 2: FTP test protocol + result entry. Also used for retests (screen 6). */
 @Composable
 fun FtpTestScreen(
     data: AppData,
     isRetest: Boolean,
-    onDownload: (Workout) -> Unit,
+    onDownloadZwo: (Workout) -> Unit,
+    onDownloadMrc: (Workout) -> Unit,
     onSave: (ftp: Int, source: String) -> Unit,
     retestSessionId: String?,
     onMarkTestDone: (String) -> Unit,
+    /** Opens a file picker; the callback gets the best 20-minute power from the ride, or an error. */
+    onPickTestRide: ((Result<Int>) -> Unit) -> Unit,
 ) {
     val test = WorkoutLibrary.ftpTest()
     var avgText by remember { mutableStateOf("") }
+    var rideMessage by remember { mutableStateOf<String?>(null) }
     var ramp by remember { mutableStateOf(false) }
     var saved by remember { mutableStateOf<Int?>(null) }
     val input = avgText.toIntOrNull()
@@ -180,11 +258,26 @@ fun FtpTestScreen(
             Muted("Use ERG mode off / resistance or slope mode for the 20-minute effort, so you control the power.")
         }
         SectionCard { WorkoutProfile(test, heightDp = 80) }
-        OutlinedButton(onClick = { onDownload(test) }, Modifier.fillMaxWidth()) {
-            Icon(Icons.Default.Download, null); Text("  Download test .zwo")
+        OutlinedButton(onClick = { onDownloadZwo(test) }, Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.Download, null); Text("  Zwift / MyWhoosh (.zwo)")
         }
+        OutlinedButton(onClick = { onDownloadMrc(test) }, Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.Download, null); Text("  ROUVY / TPV (.mrc)")
+        }
+        Muted("With the .mrc, turn ERG mode off for the hard efforts. .mrc files can't do \"ride as hard as you can\".")
         SectionCard {
             Text("Your result", fontWeight = FontWeight.SemiBold)
+            OutlinedButton(
+                onClick = {
+                    onPickTestRide { r ->
+                        r.onSuccess { best20 -> ramp = false; avgText = best20.toString(); rideMessage = "Found your best 20 minutes in the ride file: $best20 W." }
+                            .onFailure { rideMessage = it.message }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Icon(Icons.Default.UploadFile, null); Text("  Use my ride file (.fit)") }
+            rideMessage?.let { Muted(it) }
+            Muted("Or type it in:")
             ChoiceChips(listOf("20-min test" to !ramp, "Ramp test" to ramp)) { ramp = it == 1 }
             OutlinedTextField(
                 avgText, { avgText = it.filter(Char::isDigit).take(4) },

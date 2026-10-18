@@ -58,7 +58,12 @@ data class Workout(
     val purpose: String,
     val kind: SessionKind,
     val steps: List<Step>,
+    /** 1.0 normally; e.g. 0.96 after "lower my targets by 4%". Used to keep zone names as planned. */
+    val targetScale: Double = 1.0,
 ) {
+    /** The zone a step was designed for, ignoring any easing. */
+    fun plannedZone(step: Step): Zone = Zone.of(step.targetPct / targetScale)
+
     val durationSec: Int get() = steps.sumOf { it.totalDurationSec }
     val durationMin: Int get() = durationSec / 60
     val isHard: Boolean get() = kind == SessionKind.INTERVALS || kind == SessionKind.FTP_TEST
@@ -141,12 +146,16 @@ data class PlanWeek(
     val weekInBlock: Int,
     val isRecovery: Boolean,
     val sessions: List<PlannedSession>,
+    /** The week's index in the original plan. Differs from [index] once a week has been repeated. */
+    val sourceIndex: Int = index,
+    /** True if this is an extra copy of an earlier week, added by "repeat this week". */
+    val isRepeat: Boolean = false,
 ) {
     val endDate: LocalDate get() = startDate.plusDays(6)
     val hasRetest: Boolean get() = sessions.any { it.workout.kind == SessionKind.FTP_TEST }
     val title: String
-        get() = if (isRecovery) "Recovery week + FTP retest"
-        else "${blockType.displayName}: week $weekInBlock"
+        get() = (if (isRecovery) "Recovery week + FTP retest"
+        else "${blockType.displayName}: week $weekInBlock") + if (isRepeat) " (repeat)" else ""
 
     fun contains(date: LocalDate): Boolean = !date.isBefore(startDate) && !date.isAfter(endDate)
 }
