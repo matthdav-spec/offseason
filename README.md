@@ -64,10 +64,10 @@ Testers go to **Settings › Your data › Export** and send you the `.json` fil
 Done:
 - All 8 screens: onboarding (with disclaimer and readiness questions), FTP test, plan overview, this week, session detail, retest, progress and settings.
 - Real plan engine, 42 unit tests.
-- .zwo export for single sessions and a zip of the whole week.
+- .zwo export for single sessions, and a weekly zip with each session as .zwo (Zwift, MyWhoosh) and .mrc (ROUVY, TrainingPeaks Virtual).
 - Local-only storage, plus export/import.
 
 Not yet (Milestone 2+):
 - Missed-session rescheduling and "reduce targets / repeat week" suggestions from RPE.
-- .erg/.mrc and .fit export, and Intervals.icu sync.
+- .fit export and Intervals.icu sync.
 - The release APK is signed with a development key. Before the Play Store, create a proper signing key.

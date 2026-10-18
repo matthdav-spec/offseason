@@ -128,8 +128,24 @@ class LoadAndExportTest {
         ZipInputStream(ByteArrayInputStream(ZwoExporter.weekBundle(week))).use { zip ->
             generateSequence { zip.nextEntry }.forEach { names += it.name }
         }
-        assertEquals(week.sessions.size, names.size)
-        assertTrue(names.all { it.endsWith(".zwo") && it.startsWith("2026-") })
+        assertEquals(week.sessions.size, names.count { it.endsWith(".zwo") })
+        assertEquals(week.sessions.size, names.count { it.endsWith(".mrc") })
+        assertTrue(names.all { it.startsWith("2026-") })
+    }
+
+    @Test
+    fun `mrc matches the workout's length and shape`() {
+        val w = WorkoutLibrary.workout(HoursBucket.FOUR, BlockType.SWEET_SPOT, 0, 2, false, SlotRole.INTERVALS_A)
+        val mrc = MrcExporter.toMrc(w)
+        assertTrue(mrc.startsWith("[COURSE HEADER]"))
+        assertTrue(mrc.contains("MINUTES PERCENT"))
+        val points = mrc.lines()
+            .dropWhile { it != "[COURSE DATA]" }.drop(1).takeWhile { it != "[END COURSE DATA]" }
+            .map { line -> line.split("	").let { it[0].toDouble() to it[1].toDouble() } }
+        assertEquals(0.0, points.first().first)
+        assertEquals(w.durationSec / 60.0, points.last().first, 0.01)
+        assertTrue(points.zipWithNext().all { (a, b) -> b.first >= a.first }, "time must never go backwards")
+        assertEquals(3, points.count { it.second == 91.0 } / 2, "three sweet spot efforts at 91%")
     }
 
     @Test

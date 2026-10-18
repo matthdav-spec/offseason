@@ -243,7 +243,7 @@ fun SettingsScreen(
 fun HelpScreen() {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Getting sessions onto your trainer", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text("Off-Season creates .zwo workout files. Zwift, MyWhoosh and TrainingPeaks Virtual can all load them. The watts scale to the FTP set in that app, so keep your FTP the same in both places.")
+        Text("Off-Season creates workout files in two formats: .zwo for Zwift and MyWhoosh, and .mrc for ROUVY and TrainingPeaks Virtual. Targets are a percentage of FTP, so the watts scale to the FTP set in that app. Keep your FTP the same in both places.")
         SectionCard {
             Text("1. Get the files to your trainer computer", fontWeight = FontWeight.SemiBold)
             Text("Tap \"Week's sessions\" on the This Week screen, then email the zip to yourself or save it to Google Drive. Open it on the PC, Mac or tablet you ride with, and unzip it.")
@@ -254,12 +254,17 @@ fun HelpScreen() {
         }
         SectionCard {
             Text("2b. MyWhoosh", fontWeight = FontWeight.SemiBold)
-            Text("In MyWhoosh go to Workouts › Custom › Import, and pick the .zwo file.")
+            Text("Open the MyWhoosh workout builder on the MyWhoosh website, choose Import, and pick the .zwo file. It then appears in your custom workouts in the app.")
         }
         SectionCard {
-            Text("2c. TrainingPeaks Virtual", fontWeight = FontWeight.SemiBold)
-            Text("Go to Workouts › Import, and pick the .zwo file.")
+            Text("2c. ROUVY", fontWeight = FontWeight.SemiBold)
+            Text("Log in to the ROUVY website on a computer and open Workouts. Create a workout by importing a file, and pick the .mrc file (ROUVY doesn't take .zwo). Save it, then open ROUVY on your trainer device. The workout is under your own workouts, and runs in ERG mode at your ROUVY FTP.")
         }
+        SectionCard {
+            Text("2d. TrainingPeaks Virtual", fontWeight = FontWeight.SemiBold)
+            Text("Go to Workouts › Import, and pick the .mrc file.")
+        }
+        Muted("The week's zip has every session as both .zwo and .mrc. Use whichever your app needs. For FTP tests, use the .zwo or turn ERG mode off: .mrc can't do a \"ride as hard as you can\" effort.")
         Muted("On a tablet or phone running Zwift, the easiest route is to use a computer once, or wait for Intervals.icu sync in a future version.")
     }
 }

@@ -44,13 +44,20 @@ object ZwoExporter {
     fun fileName(workout: Workout, prefix: String = ""): String =
         (prefix + workout.code + "_" + workout.name).replace(Regex("[^A-Za-z0-9._-]+"), "_") + ".zwo"
 
-    /** A zip of every session in a week, named by date so they sort in order. */
+    /**
+     * A zip of every session in a week, named by date so they sort in order. Each session is
+     * included as .zwo (Zwift, MyWhoosh) and .mrc (Rouvy, TrainingPeaks Virtual and older apps).
+     */
     fun weekBundle(week: PlanWeek): ByteArray {
         val out = ByteArrayOutputStream()
         ZipOutputStream(out).use { zip ->
             for (session in week.sessions) {
-                zip.putNextEntry(ZipEntry(fileName(session.workout, prefix = "${session.date}_")))
+                val name = fileName(session.workout, prefix = "${session.date}_")
+                zip.putNextEntry(ZipEntry(name))
                 zip.write(toZwo(session.workout).toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+                zip.putNextEntry(ZipEntry(MrcExporter.fileName(name)))
+                zip.write(MrcExporter.toMrc(session.workout).toByteArray(Charsets.UTF_8))
                 zip.closeEntry()
             }
         }
@@ -58,4 +65,49 @@ object ZwoExporter {
     }
 
     fun weekBundleName(week: PlanWeek) = "OffSeason_week${week.index + 1}_${week.startDate}.zip"
+}
+
+/**
+ * The older .mrc format: a list of (minutes, % FTP) points joined by straight lines.
+ * Steady blocks need two points at the same time to make a sharp step.
+ * .mrc has no "free ride", so all-out test efforts use their estimated % FTP. Do FTP tests
+ * with the .zwo, or with ERG mode off.
+ */
+object MrcExporter {
+    fun toMrc(workout: Workout): String {
+        val points = mutableListOf<Pair<Double, Double>>()
+        var t = 0.0
+        fun hold(sec: Int, pct: Double) {
+            points += t to pct
+            t += sec / 60.0
+            points += t to pct
+        }
+        for (s in workout.steps) when (s.type) {
+            StepType.WARMUP, StepType.COOLDOWN, StepType.RAMP -> {
+                points += t to s.powerPctLow.toDouble()
+                t += s.durationSec / 60.0
+                points += t to (s.powerPctHigh ?: s.powerPctLow).toDouble()
+            }
+            StepType.INTERVALS -> repeat(s.repeat!!) {
+                hold(s.durationSec, s.targetPct)
+                hold(s.offDurationSec!!, s.offPowerPct!!.toDouble())
+            }
+            StepType.STEADY, StepType.FREE_RIDE -> hold(s.durationSec, s.targetPct)
+        }
+        return buildString {
+            appendLine("[COURSE HEADER]")
+            appendLine("VERSION = 2")
+            appendLine("UNITS = ENGLISH")
+            appendLine("DESCRIPTION = ${workout.name.replace(Regex("[\r\n]"), " ")}")
+            appendLine("FILE NAME = ${workout.code}")
+            appendLine("MINUTES PERCENT")
+            appendLine("[END COURSE HEADER]")
+            appendLine("[COURSE DATA]")
+            for ((min, pct) in points) appendLine(String.format(Locale.ROOT, "%.2f\t%.0f", min, pct))
+            appendLine("[END COURSE DATA]")
+        }
+    }
+
+    /** Same name as the .zwo, with the .mrc extension. */
+    fun fileName(zwoName: String) = zwoName.removeSuffix(".zwo") + ".mrc"
 }
