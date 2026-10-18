@@ -44,6 +44,7 @@ import com.offseason.engine.Workout
 import com.offseason.engine.WorkoutLibrary
 import com.offseason.engine.Zone
 import java.time.format.DateTimeFormatter
+import com.offseason.app.format
 import kotlin.math.roundToInt
 
 private fun watts(pct: Number, ftp: Int?) = ftp?.let { "${Ftp.watts(pct, it)} W" } ?: "${pct.toDouble().roundToInt()}%"

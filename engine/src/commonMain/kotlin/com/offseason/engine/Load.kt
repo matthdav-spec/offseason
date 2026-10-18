@@ -1,6 +1,6 @@
 package com.offseason.engine
 
-import java.time.LocalDate
+import kotlinx.datetime.LocalDate
 import kotlin.math.exp
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -71,7 +71,7 @@ object Load {
         var fat = startFatigue
         val out = mutableListOf<DayLoad>()
         var d = from
-        while (!d.isAfter(to)) {
+        while (d <= to) {
             val load = dailyLoad[d] ?: 0.0
             fit += (load - fit) * kFit
             fat += (load - fat) * kFat

@@ -4,8 +4,8 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.io.ByteArrayInputStream
-import java.time.DayOfWeek
-import java.time.LocalDate
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
 import java.util.zip.ZipInputStream
 import javax.xml.parsers.DocumentBuilderFactory
 
@@ -40,7 +40,7 @@ class LoadAndExportTest {
     fun `planned session loads are in a sensible range`() {
         val plan = PlanGenerator.generate(
             PlanRequest(
-                LocalDate.of(2026, 10, 26), PlanLength.WEEKS_16, HoursBucket.FIVE, RecoveryCycle.THREE_ONE,
+                LocalDate(2026, 10, 26), PlanLength.WEEKS_16, HoursBucket.FIVE, RecoveryCycle.THREE_ONE,
                 AthleteSchedule(DayOfWeek.entries.toSet()),
             ),
         )
@@ -54,7 +54,7 @@ class LoadAndExportTest {
     fun `fitness rise per week stays under the cap from a modest base`() {
         val plan = PlanGenerator.generate(
             PlanRequest(
-                LocalDate.of(2026, 10, 26), PlanLength.WEEKS_16, HoursBucket.FIVE, RecoveryCycle.THREE_ONE,
+                LocalDate(2026, 10, 26), PlanLength.WEEKS_16, HoursBucket.FIVE, RecoveryCycle.THREE_ONE,
                 AthleteSchedule(setOf(DayOfWeek.TUESDAY, DayOfWeek.THURSDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)),
             ),
         )
@@ -68,8 +68,8 @@ class LoadAndExportTest {
 
     @Test
     fun `fitness and fatigue follow exponential averages`() {
-        val d0 = LocalDate.of(2026, 1, 1)
-        val loads = (0 until 100).associate { d0.plusDays(it.toLong()) to 50.0 }
+        val d0 = LocalDate(2026, 1, 1)
+        val loads = (0 until 100).associate { d0.plusDays(it) to 50.0 }
         val s = Load.series(loads, d0, d0.plusDays(99))
         assertEquals(50.0, s.last().fatigue, 0.1)
         assertTrue(s.last().fitness in 40.0..50.0)
@@ -119,7 +119,7 @@ class LoadAndExportTest {
     fun `week bundle contains one zwo per session`() {
         val plan = PlanGenerator.generate(
             PlanRequest(
-                LocalDate.of(2026, 10, 26), PlanLength.WEEKS_4, HoursBucket.FOUR, RecoveryCycle.THREE_ONE,
+                LocalDate(2026, 10, 26), PlanLength.WEEKS_4, HoursBucket.FOUR, RecoveryCycle.THREE_ONE,
                 AthleteSchedule(setOf(DayOfWeek.TUESDAY, DayOfWeek.THURSDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)),
             ),
         )
@@ -157,5 +157,5 @@ class LoadAndExportTest {
     }
 
     private fun dummyWeek(recovery: Boolean) =
-        PlanWeek(0, LocalDate.of(2026, 10, 26), 0, BlockType.SWEET_SPOT, if (recovery) 4 else 1, recovery, emptyList())
+        PlanWeek(0, LocalDate(2026, 10, 26), 0, BlockType.SWEET_SPOT, if (recovery) 4 else 1, recovery, emptyList())
 }

@@ -40,8 +40,10 @@ import com.offseason.engine.PlanWeek
 import com.offseason.engine.PlannedSession
 import com.offseason.engine.SessionKind
 import com.offseason.engine.Status
-import java.time.DayOfWeek
-import java.time.LocalDate
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
+import com.offseason.engine.*
+import com.offseason.app.format
 import java.time.format.DateTimeFormatter
 
 private val dayFmt = DateTimeFormatter.ofPattern("EEE d MMM")

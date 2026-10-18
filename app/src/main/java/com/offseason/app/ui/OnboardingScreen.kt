@@ -43,12 +43,11 @@ import com.offseason.engine.Expectations
 import com.offseason.engine.PlanGenerator
 import com.offseason.engine.PlanLength
 import com.offseason.engine.RecoveryCycle
-import java.time.DayOfWeek
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneOffset
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
+import com.offseason.engine.*
+import com.offseason.app.format
 import java.time.format.DateTimeFormatter
-import java.time.temporal.TemporalAdjusters
 
 val READINESS_QUESTIONS = listOf(
     "heart" to "Has a doctor ever said you have a heart condition, or that you should only exercise under medical supervision?",
@@ -88,7 +87,7 @@ fun OnboardingScreen(
     var hardRuns by remember { mutableStateOf(setOf(DayOfWeek.WEDNESDAY)) }
     var weeks by rememberSaveable { mutableIntStateOf(12) }
     var cycle by rememberSaveable { mutableStateOf(RecoveryCycle.THREE_ONE) }
-    var startDate by remember { mutableStateOf(today.with(TemporalAdjusters.next(DayOfWeek.MONDAY))) }
+    var startDate by remember { mutableStateOf(today.plusDays((DayOfWeek.MONDAY.isoNumber - today.dayOfWeek.isoNumber + 6) % 7 + 1)) }
 
     val ftp = ftpText.toIntOrNull()
     val canContinue = when (page) {
@@ -128,11 +127,11 @@ fun OnboardingScreen(
                             name = name.trim(),
                             experience = experience,
                             hoursPerWeek = hours,
-                            bikeDays = bikeDays.map { it.value }.sorted(),
-                            swimDays = swimDays.map { it.value }.sorted(),
-                            runDays = runDays.map { it.value }.sorted(),
-                            longRunDay = longRun?.value,
-                            hardRunDays = hardRuns.map { it.value }.sorted(),
+                            bikeDays = bikeDays.map { it.isoNumber }.sorted(),
+                            swimDays = swimDays.map { it.isoNumber }.sorted(),
+                            runDays = runDays.map { it.isoNumber }.sorted(),
+                            longRunDay = longRun?.isoNumber,
+                            hardRunDays = hardRuns.map { it.isoNumber }.sorted(),
                             planWeeks = weeks,
                             startDate = startDate.toString(),
                             recoveryCycle = cycle.name,
@@ -295,13 +294,13 @@ private fun PlanPage(
 
     if (picking) {
         val state = rememberDatePickerState(
-            initialSelectedDateMillis = start.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+            initialSelectedDateMillis = start.toEpochDays().toLong() * 86_400_000L,
         )
         DatePickerDialog(
             onDismissRequest = { picking = false },
             confirmButton = {
                 TextButton(onClick = {
-                    state.selectedDateMillis?.let { onStart(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()) }
+                    state.selectedDateMillis?.let { onStart(LocalDate.fromEpochDays((it / 86_400_000L).toInt())) }
                     picking = false
                 }) { Text("OK") }
             },

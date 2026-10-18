@@ -1,6 +1,6 @@
 package com.offseason.engine
 
-import java.time.LocalDate
+import kotlinx.datetime.LocalDate
 import kotlin.math.roundToInt
 
 /**
@@ -78,9 +78,9 @@ object WeekRepeats {
         return plan.copy(weeks = out)
     }
 
-    private fun shift(w: PlanWeek, newIndex: Int, planStart: java.time.LocalDate, idPrefix: String, isRepeat: Boolean = false): PlanWeek {
-        val newStart = planStart.plusWeeks(newIndex.toLong())
-        val days = java.time.temporal.ChronoUnit.DAYS.between(w.startDate, newStart)
+    private fun shift(w: PlanWeek, newIndex: Int, planStart: LocalDate, idPrefix: String, isRepeat: Boolean = false): PlanWeek {
+        val newStart = planStart.plusWeeks(newIndex)
+        val days = w.startDate.daysTo(newStart)
         return w.copy(
             index = newIndex,
             startDate = newStart,

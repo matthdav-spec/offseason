@@ -22,7 +22,7 @@ object PlanGenerator {
             val block = BLOCK_ORDER[blockIndex]
             for (weekInBlock in 1..request.recoveryCycle.weeksPerBlock) {
                 val isRecovery = weekInBlock == request.recoveryCycle.weeksPerBlock
-                val weekStart = request.startDate.plusWeeks(weekIndex.toLong())
+                val weekStart = request.startDate.plusWeeks(weekIndex)
                 val workouts = WorkoutLibrary.rolesFor(request.hours).associateWith { role ->
                     WorkoutLibrary.workout(request.hours, block, blockIndex, weekInBlock, isRecovery, role)
                 }
@@ -36,8 +36,8 @@ object PlanGenerator {
                 val placement = Scheduler.place(slots, request.schedule, weekStartDay)
                 val sessions = placement.map { (role, day) ->
                     PlannedSession(
-                        id = "w%02d-%s".format(weekIndex, role.name),
-                        date = weekStart.plusDays(Scheduler.offset(weekStartDay, day).toLong()),
+                        id = "w" + weekIndex.toString().padStart(2, '0') + "-" + role.name,
+                        date = weekStart.plusDays(Scheduler.offset(weekStartDay, day)),
                         weekIndex = weekIndex,
                         role = role,
                         workout = workouts.getValue(role),

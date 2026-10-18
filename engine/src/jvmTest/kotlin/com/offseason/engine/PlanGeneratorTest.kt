@@ -6,18 +6,18 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
-import java.time.DayOfWeek.FRIDAY
-import java.time.DayOfWeek.MONDAY
-import java.time.DayOfWeek.SATURDAY
-import java.time.DayOfWeek.SUNDAY
-import java.time.DayOfWeek.THURSDAY
-import java.time.DayOfWeek.TUESDAY
-import java.time.DayOfWeek.WEDNESDAY
-import java.time.LocalDate
+import kotlinx.datetime.DayOfWeek.FRIDAY
+import kotlinx.datetime.DayOfWeek.MONDAY
+import kotlinx.datetime.DayOfWeek.SATURDAY
+import kotlinx.datetime.DayOfWeek.SUNDAY
+import kotlinx.datetime.DayOfWeek.THURSDAY
+import kotlinx.datetime.DayOfWeek.TUESDAY
+import kotlinx.datetime.DayOfWeek.WEDNESDAY
+import kotlinx.datetime.LocalDate
 
 class PlanGeneratorTest {
 
-    private val monday = LocalDate.of(2026, 10, 26)
+    private val monday = LocalDate(2026, 10, 26)
 
     private fun request(
         length: PlanLength = PlanLength.WEEKS_12,
@@ -64,9 +64,9 @@ class PlanGeneratorTest {
 
     @Test
     fun `weeks are consecutive and start on the start date's weekday`() {
-        val wed = LocalDate.of(2026, 10, 28)
+        val wed = LocalDate(2026, 10, 28)
         val plan = PlanGenerator.generate(request(start = wed))
-        plan.weeks.forEachIndexed { i, w -> assertEquals(wed.plusWeeks(i.toLong()), w.startDate) }
+        plan.weeks.forEachIndexed { i, w -> assertEquals(wed.plusWeeks(i), w.startDate) }
         plan.sessions.forEach { s ->
             val week = plan.weeks[s.weekIndex]
             assertTrue(week.contains(s.date), "${s.id} on ${s.date} outside its week")

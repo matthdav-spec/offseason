@@ -1,6 +1,6 @@
 package com.offseason.engine
 
-import java.time.DayOfWeek
+import kotlinx.datetime.DayOfWeek
 
 /**
  * Places a week's sessions on the athlete's chosen bike days, following the triathlete rules:
@@ -87,10 +87,10 @@ object Scheduler {
     }
 
     /** Days since [weekStart], 0..6. */
-    fun offset(weekStart: DayOfWeek, day: DayOfWeek): Int = (day.value - weekStart.value + 7) % 7
+    fun offset(weekStart: DayOfWeek, day: DayOfWeek): Int = (day.isoNumber - weekStart.isoNumber + 7) % 7
 
     fun adjacent(a: DayOfWeek, b: DayOfWeek): Boolean {
-        val diff = (a.value - b.value + 7) % 7
+        val diff = (a.isoNumber - b.isoNumber + 7) % 7
         return diff == 1 || diff == 6
     }
 

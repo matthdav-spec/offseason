@@ -71,8 +71,9 @@ import com.offseason.app.ui.minutesLabel
 import com.offseason.app.ui.theme.OffSeasonTheme
 import com.offseason.engine.Plan
 import com.offseason.engine.RideSummary
-import java.time.LocalDate
-import java.time.ZoneId
+import kotlinx.datetime.LocalDate
+import com.offseason.engine.*
+import com.offseason.app.format
 import java.time.format.DateTimeFormatter
 
 class MainActivity : ComponentActivity() {
@@ -309,7 +310,7 @@ private fun AttachSharedRideDialog(
     onAttach: (String) -> Unit,
     onCancel: () -> Unit,
 ) {
-    val rideDate = ride.start.atZone(ZoneId.systemDefault()).toLocalDate()
+    val rideDate = localDateOfEpochSec(ride.startEpochSec)
     val nearby = plan.sessions.filter { !it.date.isBefore(rideDate.minusDays(3)) && !it.date.isAfter(rideDate.plusDays(3)) }
         .sortedWith(compareBy({ it.id != suggested }, { it.date }))
     val fmt = DateTimeFormatter.ofPattern("EEE d MMM")

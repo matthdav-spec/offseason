@@ -1,7 +1,9 @@
 package com.offseason.engine
 
-import java.time.DayOfWeek
-import java.time.LocalDate
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.plus
 
 /**
  * Core data types for the plan engine.
@@ -157,7 +159,7 @@ data class PlanWeek(
         get() = (if (isRecovery) "Recovery week + FTP retest"
         else "${blockType.displayName}: week $weekInBlock") + if (isRepeat) " (repeat)" else ""
 
-    fun contains(date: LocalDate): Boolean = !date.isBefore(startDate) && !date.isAfter(endDate)
+    fun contains(date: LocalDate): Boolean = date >= startDate && date <= endDate
 }
 
 data class Plan(val request: PlanRequest, val weeks: List<PlanWeek>) {
@@ -168,3 +170,20 @@ data class Plan(val request: PlanRequest, val weeks: List<PlanWeek>) {
     fun session(id: String): PlannedSession? = sessions.firstOrNull { it.id == id }
     fun weekFor(date: LocalDate): PlanWeek? = weeks.firstOrNull { it.contains(date) }
 }
+
+// ---- Small date helpers so the engine reads the same on every platform ----
+
+fun LocalDate.plusDays(n: Int): LocalDate = this + DatePeriod(days = n)
+fun LocalDate.plusDays(n: Long): LocalDate = plusDays(n.toInt())
+fun LocalDate.minusDays(n: Int): LocalDate = plusDays(-n)
+fun LocalDate.plusWeeks(n: Int): LocalDate = plusDays(n * 7)
+fun LocalDate.plusWeeks(n: Long): LocalDate = plusWeeks(n.toInt())
+fun LocalDate.isBefore(other: LocalDate): Boolean = this < other
+fun LocalDate.isAfter(other: LocalDate): Boolean = this > other
+
+/** Days from [this] to [other] (negative if [other] is earlier). */
+fun LocalDate.daysTo(other: LocalDate): Int = other.toEpochDays().toInt() - toEpochDays().toInt()
+
+/** ISO day number: Monday = 1 … Sunday = 7. */
+val DayOfWeek.isoNumber: Int get() = ordinal + 1
+fun dayOfWeekFromIso(n: Int): DayOfWeek = DayOfWeek.entries[n - 1]

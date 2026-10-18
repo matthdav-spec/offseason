@@ -1,9 +1,18 @@
 package com.offseason.engine
 
-import java.io.ByteArrayOutputStream
-import java.util.Locale
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
+import kotlin.math.abs
+import kotlin.math.roundToLong
+
+/** Formats a number with exactly [decimals] decimal places, the same on every platform ("0.90", not "0,90"). */
+fun fixed(value: Double, decimals: Int): String {
+    var factor = 1L
+    repeat(decimals) { factor *= 10 }
+    val scaled = (abs(value) * factor).roundToLong()
+    val whole = scaled / factor
+    val sign = if (value < 0 && scaled != 0L) "-" else ""
+    if (decimals == 0) return sign + whole
+    return sign + whole + "." + (scaled % factor).toString().padStart(decimals, '0')
+}
 
 /** Turns workouts into files that trainer apps can load. */
 object ZwoExporter {
@@ -37,7 +46,7 @@ object ZwoExporter {
         }
     }
 
-    private fun f(pct: Number) = String.format(Locale.ROOT, "%.2f", pct.toDouble() / 100.0)
+    private fun f(pct: Number) = fixed(pct.toDouble() / 100.0, 2)
 
     private fun xml(s: String) = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
 
@@ -45,24 +54,16 @@ object ZwoExporter {
         (prefix + workout.code + "_" + workout.name).replace(Regex("[^A-Za-z0-9._-]+"), "_") + ".zwo"
 
     /**
-     * A zip of every session in a week, named by date so they sort in order. Each session is
-     * included as .zwo (Zwift, MyWhoosh) and .mrc (Rouvy, TrainingPeaks Virtual and older apps).
+     * Every session in a week, named by date so they sort in order, as (file name, contents) pairs.
+     * Each session is included as .zwo (Zwift, MyWhoosh) and .mrc (ROUVY, TrainingPeaks Virtual).
+     * Zipping is done by each platform ([zipFiles]).
      */
-    fun weekBundle(week: PlanWeek): ByteArray {
-        val out = ByteArrayOutputStream()
-        ZipOutputStream(out).use { zip ->
-            for (session in week.sessions) {
-                val name = fileName(session.workout, prefix = "${session.date}_")
-                zip.putNextEntry(ZipEntry(name))
-                zip.write(toZwo(session.workout).toByteArray(Charsets.UTF_8))
-                zip.closeEntry()
-                zip.putNextEntry(ZipEntry(MrcExporter.fileName(name)))
-                zip.write(MrcExporter.toMrc(session.workout).toByteArray(Charsets.UTF_8))
-                zip.closeEntry()
-            }
-        }
-        return out.toByteArray()
+    fun weekFiles(week: PlanWeek): List<Pair<String, String>> = week.sessions.flatMap { session ->
+        val name = fileName(session.workout, prefix = "${session.date}_")
+        listOf(name to toZwo(session.workout), MrcExporter.fileName(name) to MrcExporter.toMrc(session.workout))
     }
+
+    fun weekBundle(week: PlanWeek): ByteArray = zipFiles(weekFiles(week))
 
     fun weekBundleName(week: PlanWeek) = "OffSeason_week${week.index + 1}_${week.startDate}.zip"
 }
@@ -103,7 +104,7 @@ object MrcExporter {
             appendLine("MINUTES PERCENT")
             appendLine("[END COURSE HEADER]")
             appendLine("[COURSE DATA]")
-            for ((min, pct) in points) appendLine(String.format(Locale.ROOT, "%.2f\t%.0f", min, pct))
+            for ((min, pct) in points) appendLine(fixed(min, 2) + "\t" + fixed(pct, 0))
             appendLine("[END COURSE DATA]")
         }
     }

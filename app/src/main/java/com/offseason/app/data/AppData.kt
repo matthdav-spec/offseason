@@ -9,8 +9,10 @@ import com.offseason.engine.RecoveryCycle
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
-import java.time.DayOfWeek
-import java.time.LocalDate
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
+import com.offseason.engine.*
+import com.offseason.app.format
 
 /**
  * Everything the app stores, in one JSON file on the device. No accounts, no server.
@@ -60,11 +62,11 @@ data class Profile(
         hours = HoursBucket.of(hoursPerWeek),
         recoveryCycle = RecoveryCycle.valueOf(recoveryCycle),
         schedule = AthleteSchedule(
-            bikeDays = bikeDays.map(DayOfWeek::of).toSet(),
-            swimDays = swimDays.map(DayOfWeek::of).toSet(),
-            runDays = runDays.map(DayOfWeek::of).toSet(),
-            longRunDay = longRunDay?.let(DayOfWeek::of),
-            hardRunDays = hardRunDays.map(DayOfWeek::of).toSet(),
+            bikeDays = bikeDays.map(::dayOfWeekFromIso).toSet(),
+            swimDays = swimDays.map(::dayOfWeekFromIso).toSet(),
+            runDays = runDays.map(::dayOfWeekFromIso).toSet(),
+            longRunDay = longRunDay?.let(::dayOfWeekFromIso),
+            hardRunDays = hardRunDays.map(::dayOfWeekFromIso).toSet(),
         ),
     )
 }

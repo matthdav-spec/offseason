@@ -34,11 +34,12 @@ import com.offseason.engine.Step
 import com.offseason.engine.StepType
 import com.offseason.engine.Workout
 import com.offseason.engine.Zone
-import java.time.DayOfWeek
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.toJavaDayOfWeek
 import java.time.format.TextStyle
 import java.util.Locale
 
-fun DayOfWeek.short(): String = getDisplayName(TextStyle.SHORT, Locale.UK)
+fun DayOfWeek.short(): String = toJavaDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.UK)
 
 fun minutesLabel(min: Int): String = if (min >= 60) "${min / 60}h" + (if (min % 60 > 0) " ${min % 60}m" else "") else "$min min"
 

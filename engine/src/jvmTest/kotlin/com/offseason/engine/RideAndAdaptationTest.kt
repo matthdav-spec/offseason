@@ -14,9 +14,9 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.time.DayOfWeek
+import kotlinx.datetime.DayOfWeek
 import java.time.Instant
-import java.time.LocalDate
+import kotlinx.datetime.LocalDate
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -51,7 +51,7 @@ class RideAndAdaptationTest {
     fun `reads power from a real fit file`() {
         val ride = FitReader.read(fitFile(List(600) { 200 }))
         assertEquals(600, ride.durationSec)
-        assertEquals(Instant.parse("2026-10-20T18:00:00Z"), ride.start)
+        assertEquals(Instant.parse("2026-10-20T18:00:00Z").epochSecond, ride.startEpochSec)
         val s = RideAnalysis.summarize(ride)
         assertEquals(200, s.avgPower)
         assertEquals(200, s.weightedPower)
@@ -77,16 +77,16 @@ class RideAndAdaptationTest {
     fun `pauses are removed and short dropouts filled`() {
         // 10 s riding, 5-minute pause, 10 s riding; plus 2 s recording interval elsewhere
         val ts = (0L until 10L) + (310L until 320L)
-        assertEquals(20, FitReader.toPerSecond(ts, List(20) { 100 }).size)
+        assertEquals(20, RideSamples.toPerSecond(ts, List(20) { 100 }).size)
         // Samples every 2 s from 0 to 18 s cover 19 seconds of riding
         val every2 = (0L until 20L step 2).toList()
-        assertEquals(19, FitReader.toPerSecond(every2, List(10) { 100 }).size)
+        assertEquals(19, RideSamples.toPerSecond(every2, List(10) { 100 }).size)
     }
 
     @Test
     fun `weighted power exceeds average for intervals`() {
         val p = IntArray(1800) { if ((it / 60) % 2 == 0) 300 else 100 }
-        val s = RideAnalysis.summarize(RideData(Instant.EPOCH, p))
+        val s = RideAnalysis.summarize(RideData(0, p))
         assertEquals(200, s.avgPower)
         assertTrue(s.weightedPower!! > 220, "weighted ${s.weightedPower}")
     }
@@ -94,18 +94,18 @@ class RideAndAdaptationTest {
     @Test
     fun `best 20 minutes finds the test effort`() {
         val p = IntArray(70 * 60) { 150 } .also { for (i in 2400 until 3600) it[i] = 260 }
-        assertEquals(260, RideAnalysis.summarize(RideData(Instant.EPOCH, p)).best20MinPower)
+        assertEquals(260, RideAnalysis.summarize(RideData(0, p)).best20MinPower)
     }
 
     @Test
     fun `session load from a ride at FTP for an hour is 100`() {
-        val s = RideAnalysis.summarize(RideData(Instant.EPOCH, IntArray(3600) { 250 }))
+        val s = RideAnalysis.summarize(RideData(0, IntArray(3600) { 250 }))
         assertEquals(100.0, s.sessionLoad(250)!!, 0.5)
     }
 
     @Test
     fun `ride with no power meter has no power numbers`() {
-        val s = RideAnalysis.summarize(RideData(Instant.EPOCH, IntArray(600)))
+        val s = RideAnalysis.summarize(RideData(0, IntArray(600)))
         assertNull(s.avgPower); assertNull(s.sessionLoad(250))
     }
 
@@ -113,7 +113,7 @@ class RideAndAdaptationTest {
 
     private val plan = PlanGenerator.generate(
         PlanRequest(
-            LocalDate.of(2026, 10, 26), PlanLength.WEEKS_8, HoursBucket.FOUR, RecoveryCycle.THREE_ONE,
+            LocalDate(2026, 10, 26), PlanLength.WEEKS_8, HoursBucket.FOUR, RecoveryCycle.THREE_ONE,
             AthleteSchedule(setOf(DayOfWeek.TUESDAY, DayOfWeek.THURSDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)),
         ),
     )

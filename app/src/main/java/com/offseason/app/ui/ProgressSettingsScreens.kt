@@ -41,8 +41,10 @@ import com.offseason.engine.Ftp
 import com.offseason.engine.Load
 import com.offseason.engine.Plan
 import com.offseason.engine.Status
-import java.time.DayOfWeek
-import java.time.LocalDate
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
+import com.offseason.engine.*
+import com.offseason.app.format
 import java.time.format.DateTimeFormatter
 
 /** Screen 7: progress in plain English. The anti-TrainingPeaks screen. */
@@ -141,11 +143,11 @@ fun SettingsScreen(
 ) {
     val p = data.profile ?: return
     var hours by remember(p) { mutableStateOf(p.hoursPerWeek) }
-    var bike by remember(p) { mutableStateOf(p.bikeDays.map(DayOfWeek::of).toSet()) }
-    var swim by remember(p) { mutableStateOf(p.swimDays.map(DayOfWeek::of).toSet()) }
-    var run by remember(p) { mutableStateOf(p.runDays.map(DayOfWeek::of).toSet()) }
-    var hard by remember(p) { mutableStateOf(p.hardRunDays.map(DayOfWeek::of).toSet()) }
-    var longRun by remember(p) { mutableStateOf(p.longRunDay?.let(DayOfWeek::of)) }
+    var bike by remember(p) { mutableStateOf(p.bikeDays.map(::dayOfWeekFromIso).toSet()) }
+    var swim by remember(p) { mutableStateOf(p.swimDays.map(::dayOfWeekFromIso).toSet()) }
+    var run by remember(p) { mutableStateOf(p.runDays.map(::dayOfWeekFromIso).toSet()) }
+    var hard by remember(p) { mutableStateOf(p.hardRunDays.map(::dayOfWeekFromIso).toSet()) }
+    var longRun by remember(p) { mutableStateOf(p.longRunDay?.let(::dayOfWeekFromIso)) }
     var ftpText by remember(data.currentFtp) { mutableStateOf(data.currentFtp?.toString() ?: "") }
     var weightText by remember(p) { mutableStateOf(p.weightKg?.toString() ?: "") }
     var wkg by remember(p) { mutableStateOf(p.showWattsPerKg) }
@@ -153,11 +155,11 @@ fun SettingsScreen(
 
     val edited = p.copy(
         hoursPerWeek = hours,
-        bikeDays = bike.map { it.value }.sorted(),
-        swimDays = swim.map { it.value }.sorted(),
-        runDays = run.map { it.value }.sorted(),
-        hardRunDays = (hard intersect run).map { it.value }.sorted(),
-        longRunDay = longRun?.takeIf { it in run }?.value,
+        bikeDays = bike.map { it.isoNumber }.sorted(),
+        swimDays = swim.map { it.isoNumber }.sorted(),
+        runDays = run.map { it.isoNumber }.sorted(),
+        hardRunDays = (hard intersect run).map { it.isoNumber }.sorted(),
+        longRunDay = longRun?.takeIf { it in run }?.isoNumber,
         weightKg = weightText.toDoubleOrNull(),
         showWattsPerKg = wkg,
     )

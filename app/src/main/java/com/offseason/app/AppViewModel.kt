@@ -25,8 +25,9 @@ import com.offseason.engine.WeekRepeats
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import java.time.LocalDate
-import java.time.ZoneId
+import kotlinx.datetime.LocalDate
+import com.offseason.engine.*
+import com.offseason.app.format
 import kotlin.math.abs
 
 /** Holds the app's data and the plan generated from it. Every screen reads from here. */
@@ -43,7 +44,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _pendingRide = MutableStateFlow<RideSummary?>(null)
     val pendingRide: StateFlow<RideSummary?> = _pendingRide.asStateFlow()
 
-    fun today(): LocalDate = LocalDate.now()
+    fun today(): LocalDate = todayLocal()
 
     private fun update(change: (AppData) -> AppData) {
         val old = _data.value
@@ -131,17 +132,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             sessionLoad = ftp?.let { ride.sessionLoad(it) },
         )
         val existing = d.completions[sessionId]
-        val date = ride.start.atZone(ZoneId.systemDefault()).toLocalDate().toString()
+        val date = localDateOfEpochSec(ride.startEpochSec).toString()
         d.copy(completions = d.completions + (sessionId to Completion(date, rpe ?: existing?.rpe ?: Rpe.ABOUT_RIGHT, stats)))
     }
 
     /** The planned session nearest the ride's date (same day first), to suggest when a file is shared in. */
     fun suggestSession(plan: Plan, ride: RideSummary): PlannedSession? {
-        val date = ride.start.atZone(ZoneId.systemDefault()).toLocalDate()
+        val date = localDateOfEpochSec(ride.startEpochSec)
         return plan.sessions
-            .filter { abs(java.time.temporal.ChronoUnit.DAYS.between(it.date, date)) <= 3 }
+            .filter { abs(it.date.daysTo(date)) <= 3 }
             .minWithOrNull(compareBy<PlannedSession> { it.id in _data.value.completions }
-                .thenBy { abs(java.time.temporal.ChronoUnit.DAYS.between(it.date, date)) }
+                .thenBy { abs(it.date.daysTo(date)) }
                 .thenBy { abs(it.workout.durationSec - ride.durationSec) })
     }
 

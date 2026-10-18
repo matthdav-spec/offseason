@@ -1,24 +1,20 @@
 package com.offseason.engine
 
-import com.garmin.fit.Decode
-import com.garmin.fit.FitRuntimeException
-import com.garmin.fit.MesgBroadcaster
-import com.garmin.fit.RecordMesgListener
-import java.io.ByteArrayInputStream
-import java.time.Instant
-import java.util.zip.ZipInputStream
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-/** A completed ride: one power reading per second of riding (pauses removed). */
-class RideData(val start: Instant, val power: IntArray) {
+/**
+ * A completed ride: one power reading per second of riding (pauses removed).
+ * [startEpochSec] is the ride's start time in seconds since 1970 (UTC).
+ */
+class RideData(val startEpochSec: Long, val power: IntArray) {
     val durationSec: Int get() = power.size
     val hasPower: Boolean get() = power.any { it > 0 }
 }
 
 /** The numbers we keep from a ride file. Watts are rounded. */
 data class RideSummary(
-    val start: Instant,
+    val startEpochSec: Long,
     val durationSec: Int,
     val avgPower: Int?,
     /** 4th-power weighted average of 30-second rolling power: how hard the ride "felt" to the body. */
@@ -34,36 +30,19 @@ data class RideSummary(
 
 class RideFileException(message: String) : Exception(message)
 
-object FitReader {
+/**
+ * Reads .fit ride files (or a .zip containing one, as Garmin Connect exports).
+ * Android uses Garmin's Java FIT SDK; the web app uses Garmin's JavaScript FIT SDK.
+ * Throws [RideFileException] with a plain-English message if the file can't be read.
+ */
+expect object FitReader {
+    fun read(bytes: ByteArray): RideData
+}
+
+/** Shared helpers for both FIT readers. */
+object RideSamples {
     /** Gaps longer than this (seconds) are treated as a pause, not riding. */
     const val MAX_GAP_SEC = 5
-
-    /**
-     * Reads a .fit activity file, or a .zip containing one (Garmin Connect's "Export Original"
-     * gives a zip). Throws [RideFileException] with a plain-English message if it can't.
-     */
-    fun read(bytes: ByteArray): RideData {
-        val fit = if (isZip(bytes)) unzipFirstFit(bytes) else bytes
-        val timestamps = mutableListOf<Long>()
-        val powers = mutableListOf<Int>()
-        try {
-            if (!Decode().isFileFit(ByteArrayInputStream(fit))) throw RideFileException("That isn't a .fit ride file.")
-            // A fresh decoder: isFileFit() leaves the one it used part-way through the file.
-            val decode = Decode()
-            val broadcaster = MesgBroadcaster(decode)
-            broadcaster.addListener(RecordMesgListener { r ->
-                val t = r.timestamp?.date?.toInstant()?.epochSecond ?: return@RecordMesgListener
-                timestamps += t
-                powers += (r.power ?: 0).coerceIn(0, 3000)
-            })
-            decode.read(ByteArrayInputStream(fit), broadcaster, broadcaster)
-        } catch (e: FitRuntimeException) {
-            if (timestamps.isEmpty()) throw RideFileException("The ride file looks damaged and couldn't be read. (${e.message})")
-            // Otherwise keep what we read: files cut short at the end are common and still useful.
-        }
-        if (timestamps.isEmpty()) throw RideFileException("The file has no ride data in it.")
-        return RideData(Instant.ofEpochSecond(timestamps.first()), toPerSecond(timestamps, powers))
-    }
 
     /** One value per second; short dropouts are filled, longer gaps (pauses) are skipped. */
     fun toPerSecond(timestamps: List<Long>, powers: List<Int>): IntArray {
@@ -76,24 +55,21 @@ object FitReader {
         return out.toIntArray()
     }
 
-    private fun isZip(b: ByteArray) = b.size > 4 && b[0] == 'P'.code.toByte() && b[1] == 'K'.code.toByte()
+    fun isZip(b: ByteArray) = b.size > 4 && b[0] == 'P'.code.toByte() && b[1] == 'K'.code.toByte()
 
-    private fun unzipFirstFit(bytes: ByteArray): ByteArray {
-        ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
-            generateSequence { zip.nextEntry }.forEach { entry ->
-                if (!entry.isDirectory && entry.name.lowercase().endsWith(".fit")) return zip.readBytes()
-            }
-        }
-        throw RideFileException("That zip file doesn't contain a .fit ride file.")
+    /** Builds [RideData] from raw record timestamps (seconds since 1970) and powers. */
+    fun build(timestamps: List<Long>, powers: List<Int>): RideData {
+        if (timestamps.isEmpty()) throw RideFileException("The file has no ride data in it.")
+        return RideData(timestamps.first(), toPerSecond(timestamps, powers.map { it.coerceIn(0, 3000) }))
     }
 }
 
 object RideAnalysis {
     fun summarize(ride: RideData): RideSummary {
-        if (!ride.hasPower) return RideSummary(ride.start, ride.durationSec, null, null, null)
+        if (!ride.hasPower) return RideSummary(ride.startEpochSec, ride.durationSec, null, null, null)
         val p = ride.power
         return RideSummary(
-            start = ride.start,
+            startEpochSec = ride.startEpochSec,
             durationSec = p.size,
             avgPower = p.average().roundToInt(),
             weightedPower = weightedPower(p).roundToInt(),
