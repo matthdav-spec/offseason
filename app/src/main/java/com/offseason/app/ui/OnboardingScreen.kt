@@ -66,7 +66,7 @@ const val DISCLAIMER =
 /** First-run setup: welcome → safety → about you → your week → your plan. */
 @Composable
 fun OnboardingScreen(
-    onFinish: (Profile, ftp: Int?) -> Unit,
+    onFinish: (Profile, ftp: Int?, lthr: Int?) -> Unit,
     today: LocalDate,
 ) {
     var page by rememberSaveable { mutableIntStateOf(0) }
@@ -77,6 +77,11 @@ fun OnboardingScreen(
     var experience by rememberSaveable { mutableStateOf(Experience.NEWER) }
     var ftpText by rememberSaveable { mutableStateOf("") }
     var needsTest by rememberSaveable { mutableStateOf(false) }
+    var doBike by rememberSaveable { mutableStateOf(true) }
+    var doRun by rememberSaveable { mutableStateOf(false) }
+    var runHours by rememberSaveable { mutableIntStateOf(3) }
+    var lthrText by rememberSaveable { mutableStateOf("") }
+    var needsLthrTest by rememberSaveable { mutableStateOf(false) }
     var accepted by rememberSaveable { mutableStateOf(false) }
     val readiness = remember { mutableStateMapOf<String, Boolean>() }
     var hours by rememberSaveable { mutableIntStateOf(4) }
@@ -90,10 +95,13 @@ fun OnboardingScreen(
     var startDate by remember { mutableStateOf(today.plusDays((DayOfWeek.MONDAY.isoNumber - today.dayOfWeek.isoNumber + 6) % 7 + 1)) }
 
     val ftp = ftpText.toIntOrNull()
+    val lthr = lthrText.toIntOrNull()
     val canContinue = when (page) {
         1 -> accepted && READINESS_QUESTIONS.all { it.first in readiness }
-        2 -> name.isNotBlank() && (needsTest || (ftp != null && ftp in 50..600))
-        3 -> bikeDays.isNotEmpty()
+        2 -> name.isNotBlank() && (doBike || doRun) &&
+            (!doBike || needsTest || (ftp != null && ftp in 50..600)) &&
+            (!doRun || needsLthrTest || (lthr != null && lthr in 100..220))
+        3 -> (!doBike || bikeDays.isNotEmpty()) && (!doRun || runDays.isNotEmpty())
         else -> true
     }
 
@@ -106,9 +114,15 @@ fun OnboardingScreen(
             when (page) {
                 0 -> WelcomePage()
                 1 -> SafetyPage(accepted, { accepted = it }, readiness)
-                2 -> AboutYouPage(name, { name = it }, experience, { experience = it }, ftpText, { ftpText = it.filter(Char::isDigit).take(3) }, needsTest, { needsTest = it })
+                2 -> AboutYouPage(
+                    name, { name = it }, experience, { experience = it },
+                    doBike, { doBike = it }, doRun, { doRun = it },
+                    ftpText, { ftpText = it.filter(Char::isDigit).take(3) }, needsTest, { needsTest = it },
+                    lthrText, { lthrText = it.filter(Char::isDigit).take(3) }, needsLthrTest, { needsLthrTest = it },
+                )
                 3 -> WeekPage(
-                    hours, { hours = it }, bikeDays, { bikeDays = it }, swimDays, { swimDays = it },
+                    doBike, doRun,
+                    hours, { hours = it }, runHours, { runHours = it }, bikeDays, { bikeDays = it }, swimDays, { swimDays = it },
                     runDays, { runDays = it; if (longRun !in it) longRun = null; hardRuns = hardRuns intersect it },
                     longRun, { longRun = it }, hardRuns, { hardRuns = it },
                 )
@@ -127,7 +141,7 @@ fun OnboardingScreen(
                             name = name.trim(),
                             experience = experience,
                             hoursPerWeek = hours,
-                            bikeDays = bikeDays.map { it.isoNumber }.sorted(),
+                            bikeDays = if (doBike) bikeDays.map { it.isoNumber }.sorted() else emptyList(),
                             swimDays = swimDays.map { it.isoNumber }.sorted(),
                             runDays = runDays.map { it.isoNumber }.sorted(),
                             longRunDay = longRun?.isoNumber,
@@ -137,8 +151,11 @@ fun OnboardingScreen(
                             recoveryCycle = cycle.name,
                             disclaimerAcceptedOn = today.toString(),
                             readiness = readiness.toMap(),
+                            runPlan = doRun,
+                            runHoursPerWeek = runHours,
                         ),
-                        if (needsTest) null else ftp,
+                        if (!doBike || needsTest) null else ftp,
+                        if (!doRun || needsLthrTest) null else lthr,
                     )
                 },
             ) { Text(if (page < pages - 1) "Continue" else "Build my plan") }
@@ -149,16 +166,16 @@ fun OnboardingScreen(
 @Composable
 private fun WelcomePage() {
     Text("Off-Season", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-    Text("Turn this winter into a stronger bike.", style = MaterialTheme.typography.titleLarge)
+    Text("Turn this winter into a stronger triathlete.", style = MaterialTheme.typography.titleLarge)
     Text(
-        "A structured indoor plan to raise your FTP (the power you can hold for about an hour) on just 3–5 hours " +
-            "a week, built around your swimming and running.",
+        "A structured winter plan for the bike, the run, or both. Raise your FTP indoors on 3–5 hours a week, and " +
+            "build your running with heart-rate zones, all scheduled around each other and your swimming.",
     )
     SectionCard {
         Text("How it works", fontWeight = FontWeight.SemiBold)
-        Text("1. Do an FTP test (or enter a recent result).")
+        Text("1. Choose bike, run or both. Do the tests (or enter recent results): FTP for the bike, LTHR for the run.")
         Text("2. Tell us your hours and which days you swim, run and ride.")
-        Text("3. Get a plan with exact watt targets. Download sessions for Zwift, MyWhoosh or TrainingPeaks Virtual.")
+        Text("3. Get a plan with exact targets: watts for the bike (download for Zwift, MyWhoosh, ROUVY or TPV) and heart rate for the run.")
         Text("4. Retest every 4 weeks. Your targets update automatically.")
     }
     SectionCard {
@@ -199,17 +216,45 @@ private fun SafetyPage(accepted: Boolean, onAccept: (Boolean) -> Unit, answers: 
 private fun AboutYouPage(
     name: String, onName: (String) -> Unit,
     exp: Experience, onExp: (Experience) -> Unit,
+    doBike: Boolean, onDoBike: (Boolean) -> Unit,
+    doRun: Boolean, onDoRun: (Boolean) -> Unit,
     ftpText: String, onFtp: (String) -> Unit,
     needsTest: Boolean, onNeedsTest: (Boolean) -> Unit,
+    lthrText: String, onLthr: (String) -> Unit,
+    needsLthrTest: Boolean, onNeedsLthrTest: (Boolean) -> Unit,
 ) {
     Text("About you", style = MaterialTheme.typography.headlineSmall)
     OutlinedTextField(name, onName, label = { Text("First name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-    Text("Cycling experience", style = MaterialTheme.typography.titleSmall)
+    Text("What would you like a plan for?", style = MaterialTheme.typography.titleSmall)
+    ChoiceChips(listOf("Bike" to (doBike && !doRun), "Run" to (doRun && !doBike), "Bike + run" to (doBike && doRun))) {
+        onDoBike(it != 1); onDoRun(it != 0)
+    }
+    Muted(
+        if (doBike && doRun) "Both plans are scheduled together, so hard days never land back to back."
+        else if (doRun) "A heart-rate-based run plan. Your bike sessions aren't planned."
+        else "An indoor bike plan to raise your FTP. Your runs aren't planned, but we schedule around them.",
+    )
+    Text("Training experience", style = MaterialTheme.typography.titleSmall)
     ChoiceChips(listOf("Fairly new to structured training" to (exp == Experience.NEWER), "Experienced" to (exp == Experience.EXPERIENCED))) {
         onExp(if (it == 0) Experience.NEWER else Experience.EXPERIENCED)
     }
+    if (doRun) {
+        Spacer(Modifier.padding(4.dp))
+        Text("Your LTHR (run)", style = MaterialTheme.typography.titleSmall)
+        Muted("Lactate threshold heart rate: your average heart rate over the last 20 minutes of a hard 30-minute solo run.")
+        OutlinedTextField(
+            lthrText, onLthr, enabled = !needsLthrTest, label = { Text("LTHR (bpm)") }, singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(),
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(needsLthrTest, onNeedsLthrTest)
+            Text("I don't know it. I need to test first.")
+        }
+        if (needsLthrTest) Muted("No problem. The run plan starts easy, so do the 30-minute LTHR test in your first week. Until then, run by feel.")
+    }
+    if (!doBike) return
     Spacer(Modifier.padding(4.dp))
-    Text("Your FTP", style = MaterialTheme.typography.titleSmall)
+    Text("Your FTP (bike)", style = MaterialTheme.typography.titleSmall)
     Muted("Functional Threshold Power: the highest power you can hold for about an hour, in watts.")
     OutlinedTextField(
         ftpText, onFtp, enabled = !needsTest, label = { Text("FTP (watts)") }, singleLine = true,
@@ -224,7 +269,9 @@ private fun AboutYouPage(
 
 @Composable
 private fun WeekPage(
+    doBike: Boolean, doRun: Boolean,
     hours: Int, onHours: (Int) -> Unit,
+    runHours: Int, onRunHours: (Int) -> Unit,
     bike: Set<DayOfWeek>, onBike: (Set<DayOfWeek>) -> Unit,
     swim: Set<DayOfWeek>, onSwim: (Set<DayOfWeek>) -> Unit,
     run: Set<DayOfWeek>, onRun: (Set<DayOfWeek>) -> Unit,
@@ -233,20 +280,33 @@ private fun WeekPage(
 ) {
     val needed = if (hours == 3) 3 else 4
     Text("Your week", style = MaterialTheme.typography.headlineSmall)
-    Text("Bike hours per week", style = MaterialTheme.typography.titleSmall)
-    ChoiceChips(listOf(3, 4, 5).map { "$it hours" to (hours == it) }) { onHours(it + 3) }
-    Muted(
-        when (hours) {
-            3 -> "Two 60-min interval sessions + one 60-min steady ride."
-            4 -> "Two 60-min interval sessions, a 90-min endurance ride, and an optional 30-min easy spin."
-            else -> "Two 70-min interval sessions, a 2-hour endurance ride and a 45-min cadence session."
-        },
-    )
-    Text("Which days can you ride?", style = MaterialTheme.typography.titleSmall)
-    DayPicker(bike, onBike)
-    if (bike.size < needed) Muted("Pick $needed days for the full plan. With fewer, we'll keep the most important sessions.")
+    if (doBike) BikeWeek(hours, onHours, bike, onBike, needed)
     Text("Which days do you swim?", style = MaterialTheme.typography.titleSmall)
     DayPicker(swim, onSwim)
+    if (doRun) {
+        Text("Run hours per week", style = MaterialTheme.typography.titleSmall)
+        ChoiceChips(listOf(2, 3, 4).map { "$it hours" to (runHours == it) }) { onRunHours(it + 2) }
+        Muted(
+            when (runHours) {
+                2 -> "A long run, one quality run and an easy run."
+                3 -> "A long run, one quality run, an easy run and an easy run with strides."
+                else -> "As 3 hours, with a longer long run and more easy running."
+            } + " Mostly easy running: the plan builds by no more than 10% a week.",
+        )
+        Text("Which days can you run?", style = MaterialTheme.typography.titleSmall)
+        DayPicker(run, onRun)
+        val runNeeded = if (runHours == 2) 3 else 4
+        if (run.size < runNeeded) Muted("Pick $runNeeded days for the full plan. With fewer, we'll keep the long run and quality run.")
+        if (run.isNotEmpty()) {
+            Text("Preferred long run day", style = MaterialTheme.typography.titleSmall)
+            val runList = run.sorted()
+            ChoiceChips(listOf("Any" to (longRun == null)) + runList.map { it.short() to (it == longRun) }) {
+                onLongRun(if (it == 0) null else runList[it - 1])
+            }
+            if (doBike) Muted("Bike and run are planned together: at most 3 hard days a week, never two in a row, and the long ride and long run on different days.")
+        }
+        return
+    }
     Text("Which days do you run?", style = MaterialTheme.typography.titleSmall)
     DayPicker(run, onRun)
     if (run.isNotEmpty()) {
@@ -259,6 +319,22 @@ private fun WeekPage(
         DayPicker(hardRuns, onHardRuns, enabled = { it in run })
         Muted("We'll try to keep hard bike sessions away from your long and hard runs, so you're fresh for each.")
     }
+}
+
+@Composable
+private fun BikeWeek(hours: Int, onHours: (Int) -> Unit, bike: Set<DayOfWeek>, onBike: (Set<DayOfWeek>) -> Unit, needed: Int) {
+    Text("Bike hours per week", style = MaterialTheme.typography.titleSmall)
+    ChoiceChips(listOf(3, 4, 5).map { "$it hours" to (hours == it) }) { onHours(it + 3) }
+    Muted(
+        when (hours) {
+            3 -> "Two 60-min interval sessions + one 60-min steady ride."
+            4 -> "Two 60-min interval sessions, a 90-min endurance ride, and an optional 30-min easy spin."
+            else -> "Two 70-min interval sessions, a 2-hour endurance ride and a 45-min cadence session."
+        },
+    )
+    Text("Which days can you ride?", style = MaterialTheme.typography.titleSmall)
+    DayPicker(bike, onBike)
+    if (bike.size < needed) Muted("Pick $needed days for the full plan. With fewer, we'll keep the most important sessions.")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

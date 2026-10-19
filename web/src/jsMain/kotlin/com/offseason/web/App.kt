@@ -34,11 +34,14 @@ fun App() {
         Route.Progress -> ProgressScreen(plan, data, today, summary)
         Route.Settings -> SettingsScreen(data)
         is Route.Session -> SessionScreen(plan, data, route.id)
+        is Route.Run -> RunScreen(plan, data, route.id)
+        is Route.LthrTest -> LthrTestScreen(data, route.runId)
         is Route.FtpTest -> FtpTestScreen(data, route.sessionId)
         Route.Install -> InstallGuide()
         is Route.Help -> when (route.topic) {
             "feel" -> FeelHelp()
             "fit" -> FitHelp()
+            "run" -> RunHelp(data.currentLthr)
             else -> TrainerHelp()
         }
     }

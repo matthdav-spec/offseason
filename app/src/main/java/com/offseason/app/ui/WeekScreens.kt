@@ -38,6 +38,7 @@ import com.offseason.app.ui.theme.AppColors
 import com.offseason.engine.Plan
 import com.offseason.engine.PlanWeek
 import com.offseason.engine.PlannedSession
+import com.offseason.engine.RunKind
 import com.offseason.engine.SessionKind
 import com.offseason.engine.Status
 import kotlinx.datetime.DayOfWeek
@@ -56,11 +57,15 @@ fun ThisWeekScreen(
     today: LocalDate,
     status: Status.Message,
     onOpenSession: (String) -> Unit,
+    onOpenRun: (String) -> Unit,
     onDownloadWeek: (PlanWeek) -> Unit,
     onFtpTest: () -> Unit,
+    onLthrTest: () -> Unit,
 ) {
     val week = plan.weekFor(today) ?: if (today.isBefore(plan.startDate)) plan.weeks.first() else plan.weeks.last()
     val ftp = data.currentFtp
+    val hasBike = plan.request.hasBike
+    val hasRun = plan.request.hasRun
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Text("Hi ${data.profile?.name ?: ""}", style = MaterialTheme.typography.headlineSmall)
@@ -72,7 +77,14 @@ fun ThisWeekScreen(
                 },
             )
         }
-        if (ftp == null) item {
+        if (hasRun && data.currentLthr == null) item {
+            SectionCard {
+                Text("Find your LTHR", fontWeight = FontWeight.SemiBold)
+                Text("Your run zones are based on LTHR. Do the 30-minute test in your first week. Until then, run easy by feel.")
+                Button(onClick = onLthrTest) { Text("LTHR test") }
+            }
+        }
+        if (hasBike && ftp == null) item {
             SectionCard {
                 Text("First, find your FTP", fontWeight = FontWeight.SemiBold)
                 Text("Every target in your plan is based on FTP. Do the 20-minute test, then enter your result.")
@@ -83,16 +95,16 @@ fun ThisWeekScreen(
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${week.startDate.format(dayFmt)} – ${week.endDate.format(dayFmt)}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                OutlinedButton(onClick = { onDownloadWeek(week) }) {
-                    Icon(Icons.Default.Download, null); Text(" Week's sessions")
+                if (hasBike) OutlinedButton(onClick = { onDownloadWeek(week) }) {
+                    Icon(Icons.Default.Download, null); Text(" Week's rides")
                 }
             }
         }
         items((0..6).map { week.startDate.plusDays(it.toLong()) }) { date ->
-            DayRow(date, week.sessions.filter { it.date == date }, plan, data, ftp, isToday = date == today, onOpenSession)
+            DayRow(date, week.sessions.filter { it.date == date }, week.runs.filter { it.date == date }, plan, data, ftp, isToday = date == today, onOpenSession, onOpenRun)
         }
-        item {
-            Muted("Download the sessions, then copy the .zwo files into your Zwift / MyWhoosh / TPV workouts folder. See the How-to guide in Settings.")
+        if (hasBike) item {
+            Muted("Download the rides, then load them into Zwift, MyWhoosh, ROUVY or TPV. See Settings › How-to guides.")
         }
     }
 }
@@ -101,14 +113,16 @@ fun ThisWeekScreen(
 private fun DayRow(
     date: LocalDate,
     sessions: List<PlannedSession>,
+    runs: List<com.offseason.engine.PlannedRun>,
     plan: Plan,
     data: AppData,
     ftp: Int?,
     isToday: Boolean,
     onOpen: (String) -> Unit,
+    onOpenRun: (String) -> Unit,
 ) {
     val profile = data.profile
-    val other = otherSports(date.dayOfWeek, profile?.toPlanRequest()?.schedule)
+    val other = otherSports(date.dayOfWeek, profile?.toPlanRequest()?.schedule, planned = plan.request.hasRun)
     Card(
         colors = CardDefaults.cardColors(containerColor = if (isToday) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer),
         border = if (isToday) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
@@ -123,7 +137,7 @@ private fun DayRow(
                 )
                 if (other.isNotBlank()) Text(other, color = AppColors.greyedOut, style = MaterialTheme.typography.bodySmall)
             }
-            if (sessions.isEmpty()) Muted("No bike session")
+            if (sessions.isEmpty() && runs.isEmpty()) Muted(if (plan.request.hasRun && plan.request.hasBike) "Rest day" else if (plan.request.hasRun) "No run" else "No bike session")
             sessions.forEach { s ->
                 val done = s.id in data.completions
                 Row(
@@ -138,14 +152,29 @@ private fun DayRow(
                     if (done) Icon(Icons.Default.CheckCircle, "Done", tint = AppColors.done)
                 }
             }
+            runs.forEach { r ->
+                Row(
+                    Modifier.fillMaxWidth().clickable { onOpenRun(r.id) }.padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.width(6.dp).height(36.dp).background(runKindColor(r.workout.kind), RoundedCornerShape(3.dp)))
+                    Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                        Text("Run · " + r.workout.name, fontWeight = FontWeight.SemiBold)
+                        Muted(minutesLabel(r.workout.durationMin) + if (data.currentLthr == null) " · by feel until LTHR test" else "")
+                    }
+                    if (r.id in data.completions) Icon(Icons.Default.CheckCircle, "Done", tint = AppColors.done)
+                }
+            }
         }
     }
 }
 
-fun otherSports(day: DayOfWeek, schedule: com.offseason.engine.AthleteSchedule?): String {
+/** Other sports on a day, shown greyed for context. Planned runs are shown as sessions, so skipped here. */
+fun otherSports(day: DayOfWeek, schedule: com.offseason.engine.AthleteSchedule?, planned: Boolean = false): String {
     if (schedule == null) return ""
     val parts = mutableListOf<String>()
     if (day in schedule.swimDays) parts += "Swim"
+    if (planned) return parts.joinToString(" · ")
     if (day == schedule.longRunDay) parts += "Long run"
     else if (day in schedule.hardRunDays) parts += "Hard run"
     else if (day in schedule.runDays) parts += "Run"
@@ -154,7 +183,7 @@ fun otherSports(day: DayOfWeek, schedule: com.offseason.engine.AthleteSchedule?)
 
 /** Screen 3: whole plan, week by week. */
 @Composable
-fun PlanOverviewScreen(plan: Plan, data: AppData, today: LocalDate, onOpenSession: (String) -> Unit) {
+fun PlanOverviewScreen(plan: Plan, data: AppData, today: LocalDate, onOpenSession: (String) -> Unit, onOpenRun: (String) -> Unit = {}) {
     val current = plan.weekFor(today)?.index ?: 0
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = current)
     val schedule = data.profile?.toPlanRequest()?.schedule
@@ -180,7 +209,8 @@ fun PlanOverviewScreen(plan: Plan, data: AppData, today: LocalDate, onOpenSessio
                         (0..6).forEach { i ->
                             val date = week.startDate.plusDays(i.toLong())
                             val s = week.sessions.firstOrNull { it.date == date }
-                            val other = otherSports(date.dayOfWeek, schedule)
+                            val r = week.runs.firstOrNull { it.date == date }
+                            val other = otherSports(date.dayOfWeek, schedule, planned = plan.request.hasRun)
                             Column(
                                 Modifier.weight(1f)
                                     .background(
@@ -194,13 +224,27 @@ fun PlanOverviewScreen(plan: Plan, data: AppData, today: LocalDate, onOpenSessio
                                 Text(date.dayOfWeek.short().take(2), style = MaterialTheme.typography.labelSmall, color = if (s != null) Color.Black else AppColors.greyedOut)
                                 Text(
                                     when {
-                                        s == null -> other.split(" ").firstOrNull()?.take(4) ?: ""
+                                        s == null -> if (r == null) other.split(" ").firstOrNull()?.take(4) ?: "" else ""
                                         s.workout.kind == SessionKind.FTP_TEST -> "TEST"
                                         s.id in data.completions -> "✓"
                                         else -> "${s.workout.durationMin}'"
                                     },
                                     style = MaterialTheme.typography.labelSmall,
                                     color = if (s != null) Color.Black else AppColors.greyedOut,
+                                )
+                                if (r != null) Text(
+                                    when {
+                                        r.workout.kind == RunKind.LTHR_TEST -> "LTHR"
+                                        r.id in data.completions -> "R✓"
+                                        else -> "R${r.workout.durationMin}"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.Black,
+                                    modifier = Modifier
+                                        .padding(top = 2.dp)
+                                        .background(runKindColor(r.workout.kind), RoundedCornerShape(4.dp))
+                                        .clickable { onOpenRun(r.id) }
+                                        .padding(horizontal = 3.dp),
                                 )
                             }
                         }

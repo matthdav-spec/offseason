@@ -122,15 +122,17 @@ fun FtpTestScreen(data: AppData, sessionId: String?) {
 
 @OptIn(ExperimentalComposeWebSvgApi::class)
 @Composable
-fun ProgressScreen(plan: Plan, data: AppData, today: LocalDate, summary: Logic.StatusSummary) {
+fun ProgressScreen(plan: Plan, data: AppData, today: LocalDate, summary: com.offseason.engine.AppLogic.StatusSummary) {
     val start = data.startingFtp
     val now = data.currentFtp
-    val due = plan.sessions.filter { !it.optional && !it.date.isAfter(today) }
+    val dueIds = plan.sessions.filter { !it.optional && !it.date.isAfter(today) }.map { it.id } +
+        plan.runs.filter { !it.date.isAfter(today) }.map { it.id }
     val rate = Logic.completionRate(plan, data, today)
     Div({ classes("app", "stack") }) {
         H1 { Text("Your progress") }
         TrafficLight(summary.message)
-        Card {
+        if (plan.request.hasRun) LthrCard(plan, data)
+        if (plan.request.hasBike) Card {
             Div({ classes("tight") }) {
                 H3 { Text("FTP") }
                 if (start == null || now == null) P { Text("Do your FTP test to start tracking.") }
@@ -138,7 +140,7 @@ fun ProgressScreen(plan: Plan, data: AppData, today: LocalDate, summary: Logic.S
                     P({ style { property("font-size", "40px"); property("color", "var(--primary)") } }) { Text("$now W") }
                     if (now != start) P { Text("${signedOneDp(Ftp.improvementPct(start, now))}% since you started ($start W)") }
                     else P { Text("Your starting point. Your first retest is at the end of week ${plan.weeks.first { it.hasRetest }.index + 1}.") }
-                    data.profile?.weightKg?.takeIf { data.profile.showWattsPerKg }?.let { Muted("${com.offseason.engine.fixed(now / it, 2)} W/kg") }
+                    data.profile?.let { p -> p.weightKg?.takeIf { p.showWattsPerKg } }?.let { Muted("${com.offseason.engine.fixed(now / it, 2)} W/kg") }
                     if (data.ftpHistory.size > 1) {
                         Hr()
                         data.ftpHistory.sortedBy { it.date }.forEach {
@@ -153,10 +155,10 @@ fun ProgressScreen(plan: Plan, data: AppData, today: LocalDate, summary: Logic.S
                 H3 { Text("Sessions") }
                 if (rate == null) P { Text("Nothing due yet. Your first session is coming up.") }
                 else {
-                    P { Text("You've done ${due.count { it.id in data.completions }} of ${due.size} planned sessions so far (${(rate * 100).toInt()}%).") }
+                    P { Text("You've done ${dueIds.count { it in data.completions }} of ${dueIds.size} planned sessions so far (${(rate * 100).toInt()}%).") }
                     Div({ classes("progress") }) { Div({ style { property("width", "${(rate * 100).toInt()}%") } }) }
                 }
-                Muted("${plan.sessions.count { it.id in data.completions }} of ${plan.sessions.count { !it.optional }} sessions in the whole plan done.")
+                Muted("${plan.sessions.count { it.id in data.completions } + plan.runs.count { it.id in data.completions }} of ${plan.sessions.count { !it.optional } + plan.runs.size} sessions in the whole plan done.")
                 val rpes = data.completions.values.groupingBy { it.rpe }.eachCount()
                 if (rpes.isNotEmpty()) Muted("How they felt: " + Rpe.entries.filter { it in rpes }.joinToString(" · ") { "${it.label} ${rpes[it]}" })
             }
@@ -171,7 +173,7 @@ fun ProgressScreen(plan: Plan, data: AppData, today: LocalDate, summary: Logic.S
                     Text(
                         when {
                             last < 1 -> "Your fitness line starts rising as you complete sessions."
-                            last > first -> "Your bike fitness has risen steadily. That's the training adding up."
+                            last > first -> "Your fitness has risen steadily. That's the training adding up."
                             else -> "Your fitness is holding steady."
                         },
                     )
@@ -183,9 +185,32 @@ fun ProgressScreen(plan: Plan, data: AppData, today: LocalDate, summary: Logic.S
                         Polyline(*pts, attrs = { attr("fill", "none"); attr("stroke", "#8CC8F0"); attr("stroke-width", "3"); attr("vector-effect", "non-scaling-stroke") })
                     }
                 }
-                Muted("Fitness is a rolling 6-week average of how much training you've done. It rises slowly with consistent riding and dips a little in recovery weeks, which is normal.")
+                Muted("Fitness is a rolling 6-week average of how much training you've done" + (if (plan.request.hasRun && plan.request.hasBike) ", bike and run together" else "") + ". It rises slowly with consistent training and dips a little in recovery weeks, which is normal.")
             }
         }
+    }
+}
+
+@Composable
+private fun LthrCard(plan: Plan, data: AppData) = Card {
+    Div({ classes("tight") }) {
+        H3 { Text("Run: LTHR") }
+        val now = data.currentLthr
+        val start = data.startingLthr
+        if (now == null || start == null) P { Text("Do the 30-minute LTHR test to set your run zones.") }
+        else {
+            P({ style { property("font-size", "40px"); property("color", "var(--primary)") } }) { Text("$now bpm") }
+            if (now == start) P { Text("Your starting point. Your next LTHR test is at the end of week ${plan.weeks.firstOrNull { it.hasRunTest }?.let { it.index + 1 } ?: 4}.") }
+            else P { Text("Started at $start bpm.") }
+            Muted("LTHR itself doesn't always rise much. The real sign of progress is running faster at the same heart rate, so note your pace on the easy runs.")
+            if (data.lthrHistory.size > 1) {
+                Hr()
+                data.lthrHistory.sortedBy { it.date }.forEach {
+                    Div({ classes("row") }) { Span({ classes("grow") }) { Text(LocalDate.parse(it.date).dayMonth()) }; Text("${it.lthr} bpm") }
+                }
+            }
+        }
+        Muted("${plan.runs.count { it.id in data.completions }} of ${plan.runs.size} runs done.")
     }
 }
 
@@ -201,6 +226,8 @@ fun SettingsScreen(data: AppData) {
     var hard by remember(p) { mutableStateOf(p.hardRunDays.map(::dayOfWeekFromIso).toSet()) }
     var longRun by remember(p) { mutableStateOf(p.longRunDay?.let(::dayOfWeekFromIso)) }
     var ftpText by remember(data.currentFtp) { mutableStateOf(data.currentFtp?.toString() ?: "") }
+    var lthrText by remember(data.currentLthr) { mutableStateOf(data.currentLthr?.toString() ?: "") }
+    var runHours by remember(p) { mutableStateOf(p.runHoursPerWeek) }
     var weightText by remember(p) { mutableStateOf(p.weightKg?.toString() ?: "") }
     var wkg by remember(p) { mutableStateOf(p.showWattsPerKg) }
     var confirmReset by remember { mutableStateOf(false) }
@@ -210,12 +237,14 @@ fun SettingsScreen(data: AppData) {
         bikeDays = bike.map { it.isoNumber }.sorted(),
         swimDays = swim.map { it.isoNumber }.sorted(),
         runDays = run.map { it.isoNumber }.sorted(),
-        hardRunDays = (hard intersect run).map { it.isoNumber }.sorted(),
+        hardRunDays = if (p.runPlan) emptyList() else (hard intersect run).map { it.isoNumber }.sorted(),
         longRunDay = longRun?.takeIf { it in run }?.isoNumber,
+        runHoursPerWeek = runHours,
         weightKg = weightText.toDoubleOrNull(),
         showWattsPerKg = wkg,
     )
     fun save() { AppState.update { it.copy(profile = edited) }; AppState.showToast("Plan updated") }
+    val canSave = edited != p && (!edited.bikePlan || edited.bikeDays.isNotEmpty()) && (!edited.runPlan || edited.runDays.isNotEmpty())
 
     Div({ classes("app", "stack") }) {
         H1 { Text("Settings") }
@@ -226,9 +255,22 @@ fun SettingsScreen(data: AppData) {
                 Btn("Get sessions into Zwift, MyWhoosh, ROUVY or TPV") { AppState.go(Route.Help("trainer")) }
                 Btn("Rating sessions & easing off") { AppState.go(Route.Help("feel")) }
                 Btn("Adding your ride files (.fit)") { AppState.go(Route.Help("fit")) }
+                if (p.runPlan) Btn("Running by heart rate") { AppState.go(Route.Help("run")) }
             }
         }
-        Card {
+        if (p.runPlan) Card {
+            Div({ classes("tight") }) {
+                H3 { Text("LTHR (run)") }
+                Div({ classes("row") }) {
+                    Input(InputType.Text) { value(lthrText); attr("inputmode", "numeric"); attr("placeholder", "bpm"); onInput { lthrText = it.value.filter(Char::isDigit).take(3) } }
+                    Btn("Update", "primary auto", enabled = lthrText.toIntOrNull()?.let { it in 100..220 && it != data.currentLthr } == true) {
+                        AppState.recordLthr(lthrText.toInt(), "manual"); AppState.showToast("LTHR updated")
+                    }
+                }
+                Muted("Use this to correct your LTHR. After a test, use the LTHR test screen instead.")
+            }
+        }
+        if (p.bikePlan) Card {
             Div({ classes("tight") }) {
                 H3 { Text("FTP") }
                 Div({ classes("row") }) {
@@ -244,20 +286,23 @@ fun SettingsScreen(data: AppData) {
             Div({ classes("tight") }) {
                 Div({ classes("row") }) {
                     H3({ classes("grow") }) { Text("Your week") }
-                    Btn("Save changes", "primary auto", enabled = edited != p && bike.isNotEmpty()) { save() }
+                    Btn("Save changes", "primary auto", enabled = canSave) { save() }
                 }
                 Muted("Change anything below, then tap Save changes. Your plan is rebuilt, and sessions you've done stay done.")
-                Chips(listOf(3, 4, 5).map { "$it h" to (hours == it) }) { hours = it + 3 }
-                P { Text("Bike days") }; DayPicker(bike, { bike = it })
-                P { Text("Swim days") }; DayPicker(swim, { swim = it })
-                P { Text("Run days") }; DayPicker(run, { run = it })
-                if (run.isNotEmpty()) {
-                    P { Text("Long run") }
-                    val runList = run.sorted()
-                    Chips(listOf("None" to (longRun == null)) + runList.map { it.short() to (it == longRun) }) { longRun = if (it == 0) null else runList[it - 1] }
-                    P { Text("Hard runs") }; DayPicker(hard, { hard = it }, enabled = { it in run })
+                if (p.bikePlan) {
+                    P { Text("Bike hours") }; Chips(listOf(3, 4, 5).map { "$it h" to (hours == it) }) { hours = it + 3 }
+                    P { Text("Bike days") }; DayPicker(bike, { bike = it })
                 }
-                Btn("Save changes", "primary", enabled = edited != p && bike.isNotEmpty()) { save() }
+                P { Text("Swim days") }; DayPicker(swim, { swim = it })
+                if (p.runPlan) { P { Text("Run hours") }; Chips(listOf(2, 3, 4).map { "$it h" to (runHours == it) }) { runHours = it + 2 } }
+                P { Text(if (p.runPlan) "Days you can run" else "Run days") }; DayPicker(run, { run = it })
+                if (run.isNotEmpty()) {
+                    P { Text(if (p.runPlan) "Preferred long run day" else "Long run") }
+                    val runList = run.sorted()
+                    Chips(listOf((if (p.runPlan) "Any" else "None") to (longRun == null)) + runList.map { it.short() to (it == longRun) }) { longRun = if (it == 0) null else runList[it - 1] }
+                    if (!p.runPlan) { P { Text("Hard runs") }; DayPicker(hard, { hard = it }, enabled = { it in run }) }
+                }
+                Btn("Save changes", "primary", enabled = canSave) { save() }
             }
         }
         Card {
@@ -293,13 +338,13 @@ fun SettingsScreen(data: AppData) {
                 Btn("Reset plan and start again", "danger") { confirmReset = true }
             }
         }
-        Muted("Off-Season web version 0.2.0")
+        Muted("Off-Season web version 0.3.0")
     }
 
     if (confirmReset) Div({ classes("overlay"); onClick { confirmReset = false } }) {
         Div({ classes("dialog"); onClick { it.stopPropagation() } }) {
             H3 { Text("Start again?") }
-            P { Text("This deletes your plan, FTP history and completed sessions from this phone. Export first if you want a backup.") }
+            P { Text("This deletes your plan, test history and completed sessions from this phone. Export first if you want a backup.") }
             Btn("Delete everything", "danger") { confirmReset = false; AppState.reset() }
             Btn("Cancel", "text") { confirmReset = false }
         }

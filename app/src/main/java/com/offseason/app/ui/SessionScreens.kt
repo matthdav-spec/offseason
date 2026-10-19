@@ -192,9 +192,10 @@ private fun RideResult(ride: com.offseason.app.data.RideStats, w: Workout, ftp: 
     }
     Text("Average ${ride.avgPower} W · Weighted ${ride.weightedPower} W")
     val rideFtp = ride.ftpAtRide ?: ftp
-    if (rideFtp != null && ride.weightedPower != null && w.kind != SessionKind.FTP_TEST) {
+    val weighted = ride.weightedPower
+    if (rideFtp != null && weighted != null && w.kind != SessionKind.FTP_TEST) {
         val planned = com.offseason.engine.Load.effortScore(w) * rideFtp
-        val pct = ride.weightedPower * 100.0 / planned
+        val pct = weighted * 100.0 / planned
         Muted(
             when {
                 pct >= 97 -> "Right on target. Nicely done."

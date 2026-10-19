@@ -51,6 +51,11 @@ fun Onboarding() {
     var experience by remember { mutableStateOf(Experience.NEWER) }
     var ftpText by remember { mutableStateOf("") }
     var needsTest by remember { mutableStateOf(false) }
+    var doBike by remember { mutableStateOf(true) }
+    var doRun by remember { mutableStateOf(false) }
+    var runHours by remember { mutableStateOf(3) }
+    var lthrText by remember { mutableStateOf("") }
+    var needsLthrTest by remember { mutableStateOf(false) }
     var accepted by remember { mutableStateOf(false) }
     val readiness = remember { mutableStateMapOf<String, Boolean>() }
     var hours by remember { mutableStateOf(4) }
@@ -64,10 +69,13 @@ fun Onboarding() {
     var start by remember { mutableStateOf(today.plusDays((DayOfWeek.MONDAY.isoNumber - today.dayOfWeek.isoNumber + 6) % 7 + 1)) }
 
     val ftp = ftpText.toIntOrNull()
+    val lthr = lthrText.toIntOrNull()
     val canContinue = when (page) {
         1 -> accepted && READINESS_QUESTIONS.all { it.first in readiness }
-        2 -> name.isNotBlank() && (needsTest || (ftp != null && ftp in 50..600))
-        3 -> bike.isNotEmpty()
+        2 -> name.isNotBlank() && (doBike || doRun) &&
+            (!doBike || needsTest || (ftp != null && ftp in 50..600)) &&
+            (!doRun || needsLthrTest || (lthr != null && lthr in 100..220))
+        3 -> (!doBike || bike.isNotEmpty()) && (!doRun || run.isNotEmpty())
         else -> true
     }
 
@@ -76,9 +84,13 @@ fun Onboarding() {
         when (page) {
             0 -> Welcome()
             1 -> Safety(accepted, { accepted = it }, readiness)
-            2 -> AboutYou(name, { name = it }, experience, { experience = it }, ftpText, { ftpText = it.filter(Char::isDigit).take(3) }, needsTest, { needsTest = it })
+            2 -> AboutYou(
+                name, { name = it }, experience, { experience = it }, doBike, { doBike = it }, doRun, { doRun = it },
+                ftpText, { ftpText = it.filter(Char::isDigit).take(3) }, needsTest, { needsTest = it },
+                lthrText, { lthrText = it.filter(Char::isDigit).take(3) }, needsLthrTest, { needsLthrTest = it },
+            )
             3 -> YourWeek(
-                hours, { hours = it }, bike, { bike = it }, swim, { swim = it },
+                doBike, doRun, hours, { hours = it }, runHours, { runHours = it }, bike, { bike = it }, swim, { swim = it },
                 run, { run = it; if (longRun !in it) longRun = null; hardRuns = hardRuns intersect it },
                 longRun, { longRun = it }, hardRuns, { hardRuns = it },
             )
@@ -93,7 +105,7 @@ fun Onboarding() {
                         name = name.trim(),
                         experience = experience,
                         hoursPerWeek = hours,
-                        bikeDays = bike.map { it.isoNumber }.sorted(),
+                        bikeDays = if (doBike) bike.map { it.isoNumber }.sorted() else emptyList(),
                         swimDays = swim.map { it.isoNumber }.sorted(),
                         runDays = run.map { it.isoNumber }.sorted(),
                         longRunDay = longRun?.isoNumber,
@@ -103,8 +115,11 @@ fun Onboarding() {
                         recoveryCycle = cycle.name,
                         disclaimerAcceptedOn = today.toString(),
                         readiness = readiness.toMap(),
+                        runPlan = doRun,
+                        runHoursPerWeek = runHours,
                     ),
-                    if (needsTest) null else ftp,
+                    if (!doBike || needsTest) null else ftp,
+                    if (!doRun || needsLthrTest) null else lthr,
                 )
             }
         }
@@ -114,19 +129,19 @@ fun Onboarding() {
 @Composable
 private fun Welcome() {
     P({ classes("brand") }) { Text("Off-Season") }
-    H2 { Text("Turn this winter into a stronger bike.") }
+    H2 { Text("Turn this winter into a stronger triathlete.") }
     P {
         Text(
-            "A structured indoor plan to raise your FTP (the power you can hold for about an hour) on just 3–5 hours " +
-                "a week, built around your swimming and running.",
+            "A structured winter plan for the bike, the run, or both. Raise your FTP indoors on 3–5 hours a week, and " +
+                "build your running with heart-rate zones, all scheduled around each other and your swimming.",
         )
     }
     Card {
         Div({ classes("tight") }) {
             H3 { Text("How it works") }
-            P { Text("1. Do an FTP test (or enter a recent result).") }
+            P { Text("1. Choose bike, run or both. Do the tests (or enter recent results): FTP for the bike, LTHR for the run.") }
             P { Text("2. Tell us your hours and which days you swim, run and ride.") }
-            P { Text("3. Get a plan with exact watt targets. Download sessions for Zwift, MyWhoosh, ROUVY or TrainingPeaks Virtual.") }
+            P { Text("3. Get a plan with exact targets: watts for the bike (download for Zwift, MyWhoosh, ROUVY or TPV) and heart rate for the run.") }
             P { Text("4. Retest every 4 weeks. Your targets update automatically.") }
         }
     }
@@ -169,19 +184,47 @@ private fun Safety(accepted: Boolean, onAccept: (Boolean) -> Unit, answers: Muta
 private fun AboutYou(
     name: String, onName: (String) -> Unit,
     exp: Experience, onExp: (Experience) -> Unit,
+    doBike: Boolean, onDoBike: (Boolean) -> Unit,
+    doRun: Boolean, onDoRun: (Boolean) -> Unit,
     ftpText: String, onFtp: (String) -> Unit,
     needsTest: Boolean, onNeedsTest: (Boolean) -> Unit,
+    lthrText: String, onLthr: (String) -> Unit,
+    needsLthrTest: Boolean, onNeedsLthrTest: (Boolean) -> Unit,
 ) {
     H1 { Text("About you") }
     Input(InputType.Text) {
         value(name); attr("placeholder", "First name"); attr("autocomplete", "given-name")
         onInput { onName(it.value) }
     }
-    H3 { Text("Cycling experience") }
+    H3 { Text("What would you like a plan for?") }
+    Chips(listOf("Bike" to (doBike && !doRun), "Run" to (doRun && !doBike), "Bike + run" to (doBike && doRun))) {
+        onDoBike(it != 1); onDoRun(it != 0)
+    }
+    Muted(
+        if (doBike && doRun) "Both plans are scheduled together, so hard days never land back to back."
+        else if (doRun) "A heart-rate-based run plan. Your bike sessions aren't planned."
+        else "An indoor bike plan to raise your FTP. Your runs aren't planned, but we schedule around them.",
+    )
+    H3 { Text("Training experience") }
     Chips(listOf("Fairly new to structured training" to (exp == Experience.NEWER), "Experienced" to (exp == Experience.EXPERIENCED))) {
         onExp(if (it == 0) Experience.NEWER else Experience.EXPERIENCED)
     }
-    H3 { Text("Your FTP") }
+    if (doRun) {
+        H3 { Text("Your LTHR (run)") }
+        Muted("Lactate threshold heart rate: your average heart rate over the last 20 minutes of a hard 30-minute solo run.")
+        Input(InputType.Text) {
+            value(lthrText); attr("placeholder", "LTHR (bpm)"); attr("inputmode", "numeric")
+            if (needsLthrTest) disabled()
+            onInput { onLthr(it.value) }
+        }
+        Label(attrs = { classes("check") }) {
+            Input(InputType.Checkbox) { checked(needsLthrTest); onChange { onNeedsLthrTest(it.value) } }
+            Text("I don't know it. I need to test first.")
+        }
+        if (needsLthrTest) Muted("No problem. The run plan starts easy, so do the 30-minute LTHR test in your first week. Until then, run by feel.")
+    }
+    if (!doBike) return
+    H3 { Text("Your FTP (bike)") }
     Muted("Functional Threshold Power: the highest power you can hold for about an hour, in watts.")
     Input(InputType.Text) {
         value(ftpText); attr("placeholder", "FTP (watts)"); attr("inputmode", "numeric")
@@ -197,7 +240,9 @@ private fun AboutYou(
 
 @Composable
 private fun YourWeek(
+    doBike: Boolean, doRun: Boolean,
     hours: Int, onHours: (Int) -> Unit,
+    runHours: Int, onRunHours: (Int) -> Unit,
     bike: Set<DayOfWeek>, onBike: (Set<DayOfWeek>) -> Unit,
     swim: Set<DayOfWeek>, onSwim: (Set<DayOfWeek>) -> Unit,
     run: Set<DayOfWeek>, onRun: (Set<DayOfWeek>) -> Unit,
@@ -206,20 +251,46 @@ private fun YourWeek(
 ) {
     val needed = if (hours == 3) 3 else 4
     H1 { Text("Your week") }
-    H3 { Text("Bike hours per week") }
-    Chips(listOf(3, 4, 5).map { "$it hours" to (hours == it) }) { onHours(it + 3) }
-    Muted(
-        when (hours) {
-            3 -> "Two 60-min interval sessions + one 60-min steady ride."
-            4 -> "Two 60-min interval sessions, a 90-min endurance ride, and an optional 30-min easy spin."
-            else -> "Two 70-min interval sessions, a 2-hour endurance ride and a 45-min cadence session."
-        },
-    )
-    H3 { Text("Which days can you ride?") }
-    DayPicker(bike, onBike)
-    if (bike.size < needed) Muted("Pick $needed days for the full plan. With fewer, we'll keep the most important sessions.")
+    if (doBike) {
+        H3 { Text("Bike hours per week") }
+        Chips(listOf(3, 4, 5).map { "$it hours" to (hours == it) }) { onHours(it + 3) }
+        Muted(
+            when (hours) {
+                3 -> "Two 60-min interval sessions + one 60-min steady ride."
+                4 -> "Two 60-min interval sessions, a 90-min endurance ride, and an optional 30-min easy spin."
+                else -> "Two 70-min interval sessions, a 2-hour endurance ride and a 45-min cadence session."
+            },
+        )
+        H3 { Text("Which days can you ride?") }
+        DayPicker(bike, onBike)
+        if (bike.size < needed) Muted("Pick $needed days for the full plan. With fewer, we'll keep the most important sessions.")
+    }
     H3 { Text("Which days do you swim?") }
     DayPicker(swim, onSwim)
+    if (doRun) {
+        H3 { Text("Run hours per week") }
+        Chips(listOf(2, 3, 4).map { "$it hours" to (runHours == it) }) { onRunHours(it + 2) }
+        Muted(
+            when (runHours) {
+                2 -> "A long run, one quality run and an easy run."
+                3 -> "A long run, one quality run, an easy run and an easy run with strides."
+                else -> "As 3 hours, with a longer long run and more easy running."
+            } + " Mostly easy running: the plan builds by no more than 10% a week.",
+        )
+        H3 { Text("Which days can you run?") }
+        DayPicker(run, onRun)
+        val runNeeded = if (runHours == 2) 3 else 4
+        if (run.size < runNeeded) Muted("Pick $runNeeded days for the full plan. With fewer, we'll keep the long run and quality run.")
+        if (run.isNotEmpty()) {
+            H3 { Text("Preferred long run day") }
+            val runList = run.sorted()
+            Chips(listOf("Any" to (longRun == null)) + runList.map { it.short() to (it == longRun) }) {
+                onLongRun(if (it == 0) null else runList[it - 1])
+            }
+            if (doBike) Muted("Bike and run are planned together: at most 3 hard days a week, never two in a row, and the long ride and long run on different days.")
+        }
+        return
+    }
     H3 { Text("Which days do you run?") }
     DayPicker(run, onRun)
     if (run.isNotEmpty()) {

@@ -67,6 +67,9 @@ import com.offseason.app.ui.SessionDetailScreen
 import com.offseason.app.ui.SettingsScreen
 import com.offseason.app.ui.ThisWeekScreen
 import com.offseason.app.ui.TrainerHelpScreen
+import com.offseason.app.ui.RunHelpScreen
+import com.offseason.app.ui.LthrTestScreen
+import com.offseason.app.ui.RunDetailScreen
 import com.offseason.app.ui.minutesLabel
 import com.offseason.app.ui.theme.OffSeasonTheme
 import com.offseason.engine.Plan
@@ -127,6 +130,8 @@ private val tabs = listOf(
 private fun titleFor(route: String?) = when {
     route == null -> ""
     route.startsWith("ftp") -> "FTP test"
+    route.startsWith("lthr") -> "LTHR test"
+    route.startsWith("run") -> "Run"
     route.startsWith("help") -> "How-to"
     else -> "Session"
 }
@@ -142,7 +147,7 @@ fun App(vm: AppViewModel) {
 
     val currentPlan = plan
     if (data.profile == null || currentPlan == null) {
-        OnboardingScreen(onFinish = { profile, ftp -> vm.completeOnboarding(profile, ftp, "entered") }, today = today)
+        OnboardingScreen(onFinish = { profile, ftp, lthr -> vm.completeOnboarding(profile, ftp, lthr) }, today = today)
         return
     }
 
@@ -207,11 +212,13 @@ fun App(vm: AppViewModel) {
                 ThisWeekScreen(
                     currentPlan, data, today, status.message,
                     onOpenSession = { nav.navigate("session/$it") },
+                    onOpenRun = { nav.navigate("run/$it") },
                     onDownloadWeek = { Sharing.shareWeek(context, it) },
                     onFtpTest = { nav.navigate("ftp") },
+                    onLthrTest = { nav.navigate("lthr") },
                 )
             }
-            composable("plan") { PlanOverviewScreen(currentPlan, data, today) { nav.navigate("session/$it") } }
+            composable("plan") { PlanOverviewScreen(currentPlan, data, today, { nav.navigate("session/$it") }, { nav.navigate("run/$it") }) }
             composable("progress") {
                 ProgressScreen(currentPlan, data, today, status.message, status.series, vm.completionRate(currentPlan, data, today))
             }
@@ -220,6 +227,7 @@ fun App(vm: AppViewModel) {
                     data,
                     onSaveProfile = { vm.updateProfile(it); Toast.makeText(context, "Plan updated", Toast.LENGTH_SHORT).show() },
                     onSaveFtp = { vm.recordFtp(it, "manual"); Toast.makeText(context, "FTP updated", Toast.LENGTH_SHORT).show() },
+                    onSaveLthr = { vm.recordLthr(it, "manual"); Toast.makeText(context, "LTHR updated", Toast.LENGTH_SHORT).show() },
                     onExport = { Sharing.shareText(context, "OffSeason_${data.profile?.name}_$today.json", vm.exportJson()) },
                     onImport = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
                     onReset = vm::resetPlan,
@@ -229,6 +237,34 @@ fun App(vm: AppViewModel) {
             composable("help/trainer") { TrainerHelpScreen() }
             composable("help/feel") { FeelHelpScreen() }
             composable("help/fit") { FitHelpScreen() }
+            composable("help/run") { RunHelpScreen(data.currentLthr) }
+            composable("run/{id}") { entry ->
+                val run = currentPlan.run(entry.arguments?.getString("id") ?: "") ?: return@composable
+                RunDetailScreen(
+                    run, data,
+                    onMarkDone = { vm.markDone(run.id, it); justRated = run.id },
+                    onUndo = { vm.unmarkDone(run.id) },
+                    onTest = { nav.navigate("lthr?run=${run.id}") },
+                    offerEasing = justRated == run.id && vm.shouldOfferEasing(currentPlan, data, run.id),
+                    canRepeatWeek = vm.canRepeatWeekOf(currentPlan, run.id),
+                    onRepeatWeek = {
+                        vm.repeatWeekOf(run.id); justRated = null
+                        Toast.makeText(context, "This week will repeat next week.", Toast.LENGTH_LONG).show()
+                    },
+                    onDeclineEasing = { vm.declineEasing(run.id); justRated = null },
+                )
+            }
+            composable(
+                "lthr?run={run}",
+                arguments = listOf(navArgument("run") { type = NavType.StringType; nullable = true; defaultValue = null }),
+            ) { entry ->
+                val runId = entry.arguments?.getString("run")
+                LthrTestScreen(
+                    data, runId,
+                    onSave = { vm.recordLthr(it, "30min") },
+                    onMarkTestDone = { id -> if (id !in vm.data.value.completions) vm.markDone(id, Rpe.HARD) },
+                )
+            }
             composable("session/{id}") { entry ->
                 val session = currentPlan.session(entry.arguments?.getString("id") ?: "") ?: return@composable
                 SessionDetailScreen(

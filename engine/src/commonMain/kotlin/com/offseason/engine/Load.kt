@@ -102,7 +102,7 @@ object Status {
         weeklyFitnessRise: Double,
         completionRate: Double?,
     ): Message = when {
-        week == null -> Message(Light.GREEN, "Plan not started yet", "Your first session is coming up. Easy riding until then.")
+        week == null -> Message(Light.GREEN, "Plan not started yet", "Your first session is coming up. Keep things easy until then.")
         week.isRecovery -> Message(
             Light.GREEN, "Recovery week",
             "This week is lighter on purpose so your body can absorb the work. Finish with the FTP retest.",
@@ -113,7 +113,7 @@ object Status {
         )
         completionRate != null && completionRate < 0.6 -> Message(
             Light.AMBER, "Let's get back on track",
-            "You've missed a few sessions. That's normal. Just focus on this week's two interval sessions.",
+            "You've missed a few sessions. That's normal. Just focus on this week's key sessions.",
         )
         freshness < -10 -> Message(
             Light.AMBER, "Building, with some fatigue",
