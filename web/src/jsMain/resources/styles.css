@@ -159,3 +159,9 @@ li + li { margin-top: 4px; }
 
 /* Small run marker in the plan grid */
 .runchip { display: inline-block; margin-top: 3px; padding: 0 4px; border-radius: 4px; color: #000; font-size: 11px; cursor: pointer; }
+
+/* Banner on the run-plan preview */
+.preview {
+    background: #F2C14E; color: #1a1400; font-size: 13px; font-weight: 600; text-align: center;
+    padding: calc(env(safe-area-inset-top) + 6px) 12px 6px;
+}

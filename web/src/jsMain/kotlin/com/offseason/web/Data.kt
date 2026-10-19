@@ -35,9 +35,15 @@ typealias Experience = com.offseason.engine.Experience
 typealias Rpe = com.offseason.engine.Rpe
 typealias RideStats = com.offseason.engine.RideStats
 
+/**
+ * True when running from the run-plan preview address (…/offseason/run-preview/). The preview keeps
+ * its own data, separate from the main app on the same website, so trying it can't touch a pilot plan.
+ */
+val isPreview: Boolean = kotlinx.browser.window.location.pathname.contains("/run-preview")
+
 /** Saves everything in the browser's storage on this phone. Nothing is sent anywhere. */
 object Store {
-    private const val KEY = "offseason.v1"
+    private val KEY = if (isPreview) "offseason.preview.v1" else "offseason.v1"
 
     fun load(): AppData = runCatching { localStorage.getItem(KEY)?.let(::decode) }.getOrNull() ?: AppData()
     fun save(d: AppData) = localStorage.setItem(KEY, encode(d))

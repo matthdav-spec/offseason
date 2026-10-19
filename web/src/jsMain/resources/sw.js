@@ -11,7 +11,8 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
     e.waitUntil(
         caches.keys()
-            .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+            // Only clear this app's own old caches: the main app and the preview share one website.
+            .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k.split('-').slice(0, -1).join('-') === VERSION.split('-').slice(0, -1).join('-')).map((k) => caches.delete(k))))
             .then(() => self.clients.claim())
     );
 });
