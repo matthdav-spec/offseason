@@ -1,9 +1,16 @@
-# Builds the Off-Season web app and publishes it to GitHub Pages whenever main changes.
+# Builds the Off-Season web app and publishes it to GitHub Pages.
+#
+#   main      → https://matthdav-spec.github.io/offseason/              (the live pilot)
+#   run-plan  → https://matthdav-spec.github.io/offseason/run-preview/  (running-plan preview)
+#
+# GitHub Pages hosts one build per site, so every run builds BOTH branches and publishes them
+# together. A push to either branch updates the site; the other part is rebuilt unchanged.
+# Each branch's engine tests must pass before anything is published.
 name: Deploy web app
 
 on:
   push:
-    branches: [main]
+    branches: [main, run-plan]
   workflow_dispatch:
 
 permissions:
@@ -20,6 +27,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main
+      - uses: actions/checkout@v4
+        with:
+          ref: run-plan
+          path: preview
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -28,13 +42,30 @@ jobs:
         with:
           node-version: 24
       - uses: gradle/actions/setup-gradle@v4
-      - name: Test the plan engine
-        run: ./gradlew :engine:jvmTest
-      - name: Build the web app
-        run: ./gradlew :web:jsBrowserDistribution
+
+      - name: Test and build the main app
+        working-directory: main
+        run: ./gradlew :engine:jvmTest :web:jsBrowserDistribution
+
+      - name: Test and build the run-plan preview
+        working-directory: preview
+        run: ./gradlew :engine:jvmTest :web:jsBrowserDistribution
+
+      - name: Put them together
+        run: |
+          mkdir site
+          cp -r main/web/build/dist/js/productionExecutable/. site/
+          mkdir site/run-preview
+          cp -r preview/web/build/dist/js/productionExecutable/. site/run-preview/
+          # Give the preview its own offline cache name, so it never clears the main app's cache.
+          sed -i "s/const VERSION = 'offseason-/const VERSION = 'offseason-preview-/" site/run-preview/sw.js
+          # Name the preview differently on the Home Screen.
+          sed -i 's/"name": "Off-Season"/"name": "Off-Season (run preview)"/; s/"short_name": "Off-Season"/"short_name": "OS preview"/' site/run-preview/manifest.webmanifest
+          sed -i 's/<meta name="apple-mobile-web-app-title" content="Off-Season">/<meta name="apple-mobile-web-app-title" content="OS preview">/' site/run-preview/index.html
+
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: web/build/dist/js/productionExecutable
+          path: site
 
   deploy:
     needs: build
