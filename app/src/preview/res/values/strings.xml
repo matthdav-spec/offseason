@@ -1,0 +1,4 @@
+<resources>
+    <!-- Preview build: a separate app on the phone, so it can't touch the pilot app's data. -->
+    <string name="app_name">OS Preview</string>
+</resources>

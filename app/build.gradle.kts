@@ -23,6 +23,15 @@ android {
             // Signed with the debug key for now so testers can sideload it. Replace before any Play Store release.
             signingConfig = signingConfigs.getByName("debug")
         }
+        // A test build of unreleased features (e.g. the running plan). It installs ALONGSIDE the
+        // pilot app as "OS Preview", with its own data, so testing it can't touch a pilot plan.
+        create("preview") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".preview"
+            versionNameSuffix = "-preview"
+            // Its app name comes from app/src/preview/res.
+            matchingFallbacks += "release"
+        }
     }
 
     compileOptions {
