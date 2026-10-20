@@ -165,3 +165,8 @@ li + li { margin-top: 4px; }
     background: #F2C14E; color: #1a1400; font-size: 13px; font-weight: 600; text-align: center;
     padding: calc(env(safe-area-inset-top) + 6px) 12px 6px;
 }
+
+/* Swim set lines: big enough to read at the poolside */
+.swimdist { font-size: 22px; font-weight: 700; letter-spacing: 0.2px; }
+.swimchip { display: inline-block; margin-top: 3px; padding: 0 4px; border-radius: 4px; color: #000; font-size: 11px; cursor: pointer; background: #5BC0BE; }
+.race { background: linear-gradient(90deg, #1D4361, #15232F); }

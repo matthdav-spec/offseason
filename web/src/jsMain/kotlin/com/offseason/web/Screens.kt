@@ -17,6 +17,7 @@ import com.offseason.engine.Step
 import com.offseason.engine.StepType
 import com.offseason.engine.Workout
 import com.offseason.engine.Zone
+import com.offseason.engine.daysTo
 import com.offseason.engine.isAfter
 import com.offseason.engine.isBefore
 import com.offseason.engine.plusDays
@@ -31,11 +32,14 @@ import org.jetbrains.compose.web.dom.Span
 import org.jetbrains.compose.web.dom.Text
 import kotlin.math.roundToInt
 
-/** Other sports on a day, shown greyed for context. Planned runs are shown as sessions, so skipped here. */
-fun otherSports(day: DayOfWeek, schedule: AthleteSchedule?, planned: Boolean = false): String {
+/**
+ * Other sports on a day, shown greyed for context. Sports the app plans are shown as sessions, so
+ * they're skipped here: [planned] = runs are planned, [swimsPlanned] = swims are planned.
+ */
+fun otherSports(day: DayOfWeek, schedule: AthleteSchedule?, planned: Boolean = false, swimsPlanned: Boolean = false): String {
     if (schedule == null) return ""
     val parts = mutableListOf<String>()
-    if (day in schedule.swimDays) parts += "Swim"
+    if (day in schedule.swimDays && !swimsPlanned) parts += "Swim"
     if (planned) return parts.joinToString(" · ")
     if (day == schedule.longRunDay) parts += "Long run"
     else if (day in schedule.hardRunDays) parts += "Hard run"
@@ -51,6 +55,7 @@ fun ThisWeekScreen(plan: Plan, data: AppData, today: LocalDate, status: Status.M
     val schedule = data.profile?.toPlanRequest()?.schedule
     val hasBike = plan.request.hasBike
     val hasRun = plan.request.hasRun
+    val hasSwim = plan.request.hasSwim
     Div({ classes("app", "stack") }) {
         Div {
             H1 { Text("Hi ${data.profile?.name ?: ""}") }
@@ -62,6 +67,8 @@ fun ThisWeekScreen(plan: Plan, data: AppData, today: LocalDate, status: Status.M
                 },
             )
         }
+        RaceCountdown(data, today)
+        if (Logic.readyToMoveUp(data)) MoveUpCard(plan)
         if (hasRun && data.currentLthr == null) Card {
             Div({ classes("tight") }) {
                 H3 { Text("Find your LTHR") }
@@ -88,12 +95,18 @@ fun ThisWeekScreen(plan: Plan, data: AppData, today: LocalDate, status: Status.M
                     Span({ classes("grow"); if (isToday) style { property("font-weight", "700") } }) {
                         Text((if (isToday) "Today · " else "") + date.shortDay())
                     }
-                    val other = otherSports(date.dayOfWeek, schedule, planned = hasRun)
-                    if (other.isNotEmpty()) Span({ classes("other") }) { Text(other) }
+                    val o = otherSports(date.dayOfWeek, schedule, planned = hasRun, swimsPlanned = hasSwim)
+                    if (o.isNotEmpty()) Span({ classes("other") }) { Text(if (plan.request.swim?.coached == true) o.replace("Swim", "Swim (coach)") else o) }
                 }
+                val other = otherSports(date.dayOfWeek, schedule, planned = hasRun, swimsPlanned = hasSwim)
                 val sessions = week.sessions.filter { it.date == date }
                 val runs = week.runs.filter { it.date == date }
-                if (sessions.isEmpty() && runs.isEmpty()) Muted(if (hasRun && hasBike) "Rest day" else if (hasRun) "No run" else "No bike session")
+                val swims = week.swims.filter { it.date == date }
+                val sports = listOf(hasBike, hasRun, hasSwim).count { it }
+                if (sessions.isEmpty() && runs.isEmpty() && swims.isEmpty() && other.isEmpty()) Muted(
+                    if (sports > 1) "Rest day" else if (hasRun) "No run" else if (hasSwim) "No swim" else "No bike session",
+                )
+                swims.forEach { sw -> SwimRow(sw, data) }
                 sessions.forEach { s -> SessionRow(s, data) }
                 runs.forEach { r -> RunRow(r, data) }
             }
@@ -128,6 +141,40 @@ private fun RunRow(r: com.offseason.engine.PlannedRun, data: AppData) {
     }
 }
 
+@Composable
+private fun SwimRow(sw: com.offseason.engine.PlannedSwim, data: AppData) {
+    Div({ classes("row", "session"); onClick { AppState.go(Route.Swim(sw.id)) } }) {
+        Span({ classes("bar"); style { property("background", swimKindColor(sw.workout.kind)) } })
+        Div({ classes("grow") }) {
+            P({ style { property("font-weight", "600") } }) { Text("Swim · " + sw.workout.name) }
+            Muted("${sw.workout.distanceM} m · about ${sw.workout.estimatedMin(data.currentCss)} min")
+        }
+        if (sw.id in data.completions) Span({ classes("tick") }) { Text("✓") }
+        Span({ classes("muted") }) { Text("›") }
+    }
+}
+
+/** "IRONMAN 70.3 Cascais · 52 weeks to go" */
+@Composable
+fun RaceCountdown(data: AppData, today: LocalDate) {
+    val p = data.profile ?: return
+    val name = p.raceName ?: return
+    val date = p.raceDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return
+    val days = today.daysTo(date)
+    if (days < 0) return
+    Card("card race") {
+        Div({ classes("row") }) {
+            Div({ classes("grow") }) {
+                P({ style { property("font-weight", "700") } }) { Text(name) }
+                Muted(date.longDay() + " " + date.year)
+            }
+            Span({ classes("right") }) {
+                Text(if (days == 0) "Race day!" else if (days < 14) "$days days to go" else "${days / 7} weeks to go")
+            }
+        }
+    }
+}
+
 // ---- Plan overview ----
 
 @Composable
@@ -148,6 +195,7 @@ fun PlanScreen(plan: Plan, data: AppData, today: LocalDate) {
                         val date = week.startDate.plusDays(i)
                         val s = week.sessions.firstOrNull { it.date == date }
                         val r = week.runs.firstOrNull { it.date == date }
+                        val sw = week.swims.firstOrNull { it.date == date }
                         Div({
                             classes(*(if (s != null) arrayOf("day", "has") else arrayOf("day")))
                             if (s != null) {
@@ -159,10 +207,23 @@ fun PlanScreen(plan: Plan, data: AppData, today: LocalDate) {
                             Div {
                                 Text(
                                     when {
-                                        s == null -> if (r == null) otherSports(date.dayOfWeek, schedule, planned = plan.request.hasRun).split(" ").firstOrNull()?.take(4) ?: "" else ""
+                                        s == null -> if (r == null && sw == null) otherSports(date.dayOfWeek, schedule, planned = plan.request.hasRun, swimsPlanned = plan.request.hasSwim).split(" ").firstOrNull()?.take(4) ?: "" else ""
                                         s.workout.kind == SessionKind.FTP_TEST -> "TEST"
                                         s.id in data.completions -> "✓"
                                         else -> "${s.workout.durationMin}'"
+                                    },
+                                )
+                            }
+                            if (sw != null) Span({
+                                classes("swimchip")
+                                style { property("background", swimKindColor(sw.workout.kind)) }
+                                onClick { it.stopPropagation(); AppState.go(Route.Swim(sw.id)) }
+                            }) {
+                                Text(
+                                    when {
+                                        sw.workout.kind == com.offseason.engine.SwimKind.CSS_TEST -> "CSS"
+                                        sw.id in data.completions -> "S✓"
+                                        else -> "S${sw.workout.distanceM}"
                                     },
                                 )
                             }

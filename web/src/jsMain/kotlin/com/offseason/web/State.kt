@@ -19,6 +19,8 @@ sealed class Route {
     data class Session(val id: String) : Route()
     data class Run(val id: String) : Route()
     data class LthrTest(val runId: String?) : Route()
+    data class Swim(val id: String) : Route()
+    data class CssTest(val swimId: String?) : Route()
     data class FtpTest(val sessionId: String?) : Route()
     data class Help(val topic: String) : Route()
     data object Install : Route()
@@ -72,6 +74,9 @@ object AppState {
     fun completeOnboarding(profile: Profile, ftp: Int?, lthr: Int?) = update { Logic.completeOnboarding(profile, ftp, lthr, today()) }
     fun recordFtp(ftp: Int, source: String) = update { Logic.recordFtp(it, ftp, source, today()) }
     fun recordLthr(lthr: Int, source: String) = update { Logic.recordLthr(it, lthr, source, today()) }
+    fun recordCss(cssSec: Int, t400: Int?, t200: Int?) = update { Logic.recordCss(it, cssSec, t400, t200, today()) }
+    fun recordSwimDistance(m: Int) = update { Logic.recordSwimDistance(it, m, today()) }
+    fun moveUpToCss() = update { d -> plan?.let { Logic.moveUpToCss(d, it, today()) } ?: d }
 
     fun markDone(id: String, rpe: Rpe) {
         update { Logic.markDone(it, id, rpe, today()) }

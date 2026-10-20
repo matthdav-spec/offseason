@@ -176,6 +176,7 @@ data class PlanWeek(
         get() = (if (isRecovery) "Recovery week" + listOfNotNull(if (hasRetest) "FTP" else null, if (hasRunTest) "LTHR" else null, if (hasSwimTest) "CSS" else null)
             .let { if (it.isEmpty()) "" else " + " + it.joinToString(" & ") + " test" }
         else if (sessions.isEmpty() && runBlock != null) "${runBlock.displayName}: week $weekInBlock"
+        else if (sessions.isEmpty() && swims.isNotEmpty()) "${SwimLibrary.BLOCK_NAMES[blockIndex]}: week $weekInBlock"
         else "${blockType.displayName}: week $weekInBlock") + if (isRepeat) " (repeat)" else ""
 
     fun contains(date: LocalDate): Boolean = date >= startDate && date <= endDate

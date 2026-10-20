@@ -105,7 +105,7 @@ object Status {
         week == null -> Message(Light.GREEN, "Plan not started yet", "Your first session is coming up. Keep things easy until then.")
         week.isRecovery -> Message(
             Light.GREEN, "Recovery week",
-            "This week is lighter on purpose so your body can absorb the work. Finish with the FTP retest.",
+            "This week is lighter on purpose so your body can absorb the work. It ends with your tests, so your targets keep up with you.",
         )
         weeklyFitnessRise > Load.MAX_WEEKLY_FITNESS_RISE || freshness < -25 -> Message(
             Light.RED, "Carrying a lot of fatigue",

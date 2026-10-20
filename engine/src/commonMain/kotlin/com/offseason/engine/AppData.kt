@@ -25,11 +25,18 @@ data class AppData(
     /** Session ids where the athlete said "no thanks" to easing, so we don't keep asking. */
     val easingDeclinedAt: List<String> = emptyList(),
     val lthrHistory: List<LthrEntry> = emptyList(),
+    /** CSS results in seconds per 100 m. */
+    val cssHistory: List<CssEntry> = emptyList(),
+    /** Longest swim without stopping, logged from "Continuous" swims and distance checks. */
+    val swimDistanceHistory: List<SwimDistanceEntry> = emptyList(),
 ) {
     val currentFtp: Int? get() = ftpHistory.maxByOrNull { it.date }?.ftp
     val startingFtp: Int? get() = ftpHistory.minByOrNull { it.date }?.ftp
     val currentLthr: Int? get() = lthrHistory.maxByOrNull { it.date }?.lthr
     val startingLthr: Int? get() = lthrHistory.minByOrNull { it.date }?.lthr
+    val currentCss: Int? get() = cssHistory.maxByOrNull { it.date }?.cssSec
+    val startingCss: Int? get() = cssHistory.minByOrNull { it.date }?.cssSec
+    val bestContinuousM: Int? get() = swimDistanceHistory.maxOfOrNull { it.distanceM }
 }
 
 @Serializable
@@ -55,6 +62,22 @@ data class Profile(
     /** Run plan on? (false for everyone in the original bike pilot) */
     val runPlan: Boolean = false,
     val runHoursPerWeek: Int = 3,
+    /** Swim plan on? */
+    val swimPlan: Boolean = false,
+    val swimsPerWeek: Int = 2,
+    val poolLengthM: Int = 25,
+    /** "BUILD_UP" (can't yet swim 400 m without stopping) or "CSS". */
+    val swimLevel: String = SwimLevel.BUILD_UP.name,
+    /** Build-up route: how far they could swim without stopping at the start (0 = not sure). */
+    val swimStartDistanceM: Int = 0,
+    /** Moved up from the build-up route to the CSS plan on this date (ISO), if they have. */
+    val swimCssFrom: String? = null,
+    /** Swims come from a coach: plan bike and run around swim days, don't plan swims. */
+    val swimCoached: Boolean = false,
+    /** The athlete's target race, e.g. "IRONMAN 70.3 Cascais". Shown as a countdown. */
+    val raceName: String? = null,
+    /** ISO date of the target race. */
+    val raceDate: String? = null,
 ) {
     val bikePlan: Boolean get() = bikeDays.isNotEmpty()
 
@@ -75,6 +98,15 @@ data class Profile(
             runDays = runDays.map(::dayOfWeekFromIso).toSet(),
             preferredLongRunDay = longRunDay?.let(::dayOfWeekFromIso),
         ) else null,
+        swim = if (swimPlan || swimCoached) SwimPlanRequest(
+            swimsPerWeek = swimsPerWeek.coerceIn(1, 3),
+            swimDays = swimDays.map(::dayOfWeekFromIso).toSet(),
+            level = SwimLevel.valueOf(swimLevel),
+            poolLengthM = poolLengthM,
+            coached = swimCoached,
+            startDistanceM = swimStartDistanceM,
+            cssFrom = swimCssFrom?.let(LocalDate::parse),
+        ) else null,
     )
 }
 
@@ -83,6 +115,11 @@ data class Profile(
 @Serializable data class FtpEntry(val date: String, val ftp: Int, val source: String)
 
 @Serializable data class LthrEntry(val date: String, val lthr: Int, val source: String)
+
+/** A CSS result. [t400Sec]/[t200Sec] are the test times, kept so the athlete can see them. */
+@Serializable data class CssEntry(val date: String, val cssSec: Int, val t400Sec: Int? = null, val t200Sec: Int? = null)
+
+@Serializable data class SwimDistanceEntry(val date: String, val distanceM: Int)
 
 @Serializable
 enum class Rpe(val label: String) {
@@ -133,7 +170,8 @@ object AppLogic {
 
     /** Every planned item's id and date, bike and run, with whether it's optional. */
     private fun dueItems(plan: Plan): List<Triple<String, LocalDate, Boolean>> =
-        plan.sessions.map { Triple(it.id, it.date, it.optional) } + plan.runs.map { Triple(it.id, it.date, false) }
+        plan.sessions.map { Triple(it.id, it.date, it.optional) } + plan.runs.map { Triple(it.id, it.date, false) } +
+            plan.swims.map { Triple(it.id, it.date, false) }
 
     /** Fraction of non-optional sessions and runs before today that were completed; null if none are due yet. */
     fun completionRate(plan: Plan, d: AppData, today: LocalDate): Double? {
@@ -145,8 +183,9 @@ object AppLogic {
     data class StatusSummary(val message: Status.Message, val series: List<Load.DayLoad>)
 
     /** Planned load of one item (bike session or run). */
-    private fun plannedLoad(plan: Plan, id: String): Double =
-        plan.session(id)?.let { Load.sessionLoad(it.workout) } ?: plan.run(id)?.let { RunLoad.sessionLoad(it.workout) } ?: 0.0
+    private fun plannedLoad(plan: Plan, id: String, css: Int? = null): Double =
+        plan.session(id)?.let { Load.sessionLoad(it.workout) } ?: plan.run(id)?.let { RunLoad.sessionLoad(it.workout) }
+            ?: plan.swim(id)?.let { SwimLoad.sessionLoad(it.workout, css) } ?: 0.0
 
     /**
      * Fitness/Fatigue from completed bike sessions and runs, plus the traffic-light message.
@@ -155,13 +194,13 @@ object AppLogic {
     fun status(plan: Plan, d: AppData, today: LocalDate): StatusSummary {
         val doneIds = dueItems(plan).map { it.first }.filter { it in d.completions }
         val daily = doneIds.groupBy { LocalDate.parse(d.completions.getValue(it).date) }
-            .mapValues { (_, ids) -> ids.sumOf { d.completions.getValue(it).ride?.sessionLoad ?: plannedLoad(plan, it) } }
+            .mapValues { (_, ids) -> ids.sumOf { d.completions.getValue(it).ride?.sessionLoad ?: plannedLoad(plan, it, d.currentCss) } }
         val from = minOf(plan.startDate, today).minusDays(7)
         // Triathletes aren't starting from zero: assume they arrive already absorbing about the
         // plan's first-week load, so the traffic light reacts to changes rather than to starting at all.
         val first = plan.weeks.first()
         val baseline = (first.sessions.filterNot { it.optional }.sumOf { Load.sessionLoad(it.workout) } +
-            first.runs.sumOf { RunLoad.sessionLoad(it.workout) }) / 7.0
+            first.runs.sumOf { RunLoad.sessionLoad(it.workout) } + first.swims.sumOf { SwimLoad.sessionLoad(it.workout, d.currentCss) }) / 7.0
         val series = Load.series(daily, from, maxOf(today, from), startFitness = baseline, startFatigue = baseline)
         val now = series.last()
         val weekAgo = series.getOrNull(series.size - 8) ?: series.first()
@@ -203,7 +242,7 @@ object AppLogic {
     }
 
     fun weekOf(plan: Plan, id: String): PlanWeek? =
-        plan.weeks.firstOrNull { w -> w.sessions.any { it.id == id } || w.runs.any { it.id == id } }
+        plan.weeks.firstOrNull { w -> w.sessions.any { it.id == id } || w.runs.any { it.id == id } || w.swims.any { it.id == id } }
 
     fun canRepeatWeekOf(plan: Plan, id: String): Boolean = weekOf(plan, id)?.let(WeekRepeats::canRepeat) == true
 
@@ -226,8 +265,10 @@ object AppLogic {
 
     // ---- Changes (pure: AppData in, AppData out) ----
 
-    fun completeOnboarding(profile: Profile, ftp: Int?, lthr: Int?, today: LocalDate) = AppData(
+    fun completeOnboarding(profile: Profile, ftp: Int?, lthr: Int?, today: LocalDate, cssSec: Int? = null) = AppData(
         profile = profile,
+        cssHistory = cssSec?.let { listOf(CssEntry(today.toString(), it)) } ?: emptyList(),
+        swimDistanceHistory = if (profile.swimPlan && profile.swimStartDistanceM > 0) listOf(SwimDistanceEntry(today.toString(), profile.swimStartDistanceM)) else emptyList(),
         ftpHistory = ftp?.let { listOf(FtpEntry(today.toString(), it, "entered")) } ?: emptyList(),
         lthrHistory = lthr?.let { listOf(LthrEntry(today.toString(), it, "entered")) } ?: emptyList(),
     )
@@ -236,6 +277,32 @@ object AppLogic {
     fun recordFtp(d: AppData, ftp: Int, source: String, today: LocalDate): AppData {
         val date = today.toString()
         return d.copy(ftpHistory = d.ftpHistory.filterNot { it.date == date } + FtpEntry(date, ftp, source), targetAdjustments = emptyList())
+    }
+
+    fun recordCss(d: AppData, cssSec: Int, t400Sec: Int?, t200Sec: Int?, today: LocalDate): AppData {
+        val date = today.toString()
+        return d.copy(cssHistory = d.cssHistory.filterNot { it.date == date } + CssEntry(date, cssSec, t400Sec, t200Sec))
+    }
+
+    fun recordSwimDistance(d: AppData, distanceM: Int, today: LocalDate): AppData {
+        val date = today.toString()
+        val best = d.swimDistanceHistory.filter { it.date == date }.maxOfOrNull { it.distanceM } ?: 0
+        return if (distanceM <= best) d
+        else d.copy(swimDistanceHistory = d.swimDistanceHistory.filterNot { it.date == date } + SwimDistanceEntry(date, distanceM))
+    }
+
+    /** Ready to leave the build-up route? (Has swum 400 m without stopping and isn't on the CSS plan yet.) */
+    fun readyToMoveUp(d: AppData): Boolean {
+        val p = d.profile ?: return false
+        return p.swimPlan && !p.swimCoached && p.swimLevel == SwimLevel.BUILD_UP.name && p.swimCssFrom == null &&
+            (d.bestContinuousM ?: 0) >= 400
+    }
+
+    /** Moves to the CSS plan from the start of next week (in the plan's week rhythm). Earlier weeks are unchanged. */
+    fun moveUpToCss(d: AppData, plan: Plan, today: LocalDate): AppData {
+        val p = d.profile ?: return d
+        val next = plan.weeks.firstOrNull { it.startDate > today }?.startDate ?: return d
+        return d.copy(profile = p.copy(swimCssFrom = next.toString()))
     }
 
     fun recordLthr(d: AppData, lthr: Int, source: String, today: LocalDate): AppData {
