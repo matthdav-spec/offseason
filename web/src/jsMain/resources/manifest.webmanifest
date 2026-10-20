@@ -1,7 +1,7 @@
 {
-  "name": "Off-Season",
-  "short_name": "Off-Season",
-  "description": "A winter FTP-building plan for triathletes.",
+  "name": "DBAP",
+  "short_name": "DBAP",
+  "description": "A winter bike and run plan for triathletes.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

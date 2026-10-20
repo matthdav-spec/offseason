@@ -18,7 +18,7 @@ private val tabs = listOf(
 
 @Composable
 fun App() {
-    if (isPreview) Div({ classes("preview") }) { Text("Preview: running plan (test version, separate from your main Off-Season plan)") }
+    if (isPreview) Div({ classes("preview") }) { Text("DBAP preview: running plan (test version, separate from your pilot plan)") }
     val data = AppState.data
     val plan = AppState.plan
     if (data.profile == null || plan == null) {

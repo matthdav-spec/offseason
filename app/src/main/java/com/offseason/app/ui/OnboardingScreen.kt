@@ -58,7 +58,7 @@ val READINESS_QUESTIONS = listOf(
 )
 
 const val DISCLAIMER =
-    "Off-Season gives general training guidance, not medical advice. Hard interval sessions and FTP tests put real " +
+    "DBAP gives general training guidance, not medical advice. Hard interval sessions and FTP tests put real " +
         "strain on your heart and body. If you have any health concerns, or answer \"yes\" to any question below, " +
         "speak to your GP before starting. Stop any session straight away if you feel unwell, dizzy or get chest pain. " +
         "You take part at your own risk."
@@ -165,7 +165,7 @@ fun OnboardingScreen(
 
 @Composable
 private fun WelcomePage() {
-    Text("Off-Season", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+    Text("DBAP", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
     Text("Turn this winter into a stronger triathlete.", style = MaterialTheme.typography.titleLarge)
     Text(
         "A structured winter plan for the bike, the run, or both. Raise your FTP indoors on 3–5 hours a week, and " +

@@ -228,7 +228,7 @@ fun App(vm: AppViewModel) {
                     onSaveProfile = { vm.updateProfile(it); Toast.makeText(context, "Plan updated", Toast.LENGTH_SHORT).show() },
                     onSaveFtp = { vm.recordFtp(it, "manual"); Toast.makeText(context, "FTP updated", Toast.LENGTH_SHORT).show() },
                     onSaveLthr = { vm.recordLthr(it, "manual"); Toast.makeText(context, "LTHR updated", Toast.LENGTH_SHORT).show() },
-                    onExport = { Sharing.shareText(context, "OffSeason_${data.profile?.name}_$today.json", vm.exportJson()) },
+                    onExport = { Sharing.shareText(context, "DBAP_${data.profile?.name}_$today.json", vm.exportJson()) },
                     onImport = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
                     onReset = vm::resetPlan,
                     onHelp = { nav.navigate(it) },

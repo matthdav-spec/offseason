@@ -251,7 +251,7 @@ fun SettingsScreen(data: AppData) {
         Card {
             Div({ classes("tight") }) {
                 H3 { Text("How-to guides") }
-                Btn("Add Off-Season to your Home Screen") { AppState.go(Route.Install) }
+                Btn("Add DBAP to your Home Screen") { AppState.go(Route.Install) }
                 Btn("Get sessions into Zwift, MyWhoosh, ROUVY or TPV") { AppState.go(Route.Help("trainer")) }
                 Btn("Rating sessions & easing off") { AppState.go(Route.Help("feel")) }
                 Btn("Adding your ride files (.fit)") { AppState.go(Route.Help("fit")) }
@@ -321,7 +321,7 @@ fun SettingsScreen(data: AppData) {
                 H3 { Text("Your data") }
                 Muted("Everything is stored only on this phone, in this browser. Export a backup now and then, or send it to Matt for the pilot.")
                 Div({ classes("footer") }) {
-                    Btn("Export") { Files.shareJson("OffSeason_${p.name}_${AppState.today()}.json", Store.encode(AppState.data)) }
+                    Btn("Export") { Files.shareJson("DBAP_${p.name}_${AppState.today()}.json", Store.encode(AppState.data)) }
                     Btn("Import") {
                         Files.pickFile("") { bytes ->
                             runCatching { Store.decode(bytes.decodeToString()) }
@@ -338,7 +338,7 @@ fun SettingsScreen(data: AppData) {
                 Btn("Reset plan and start again", "danger") { confirmReset = true }
             }
         }
-        Muted("Off-Season web version 0.3.0")
+        Muted("DBAP web version 0.3.0")
     }
 
     if (confirmReset) Div({ classes("overlay"); onClick { confirmReset = false } }) {
@@ -370,15 +370,15 @@ private fun Section(title: String, vararg lines: String, note: String? = null) =
 }
 
 @Composable
-fun InstallGuide() = Guide("Add Off-Season to your Home Screen") {
-    P { Text("Off-Season isn't in the App Store. It's a web app. Add it to your Home Screen once and it opens full screen like any other app, and works without signal.") }
+fun InstallGuide() = Guide("Add DBAP to your Home Screen") {
+    P { Text("DBAP isn't in the App Store. It's a web app. Add it to your Home Screen once and it opens full screen like any other app, and works without signal.") }
     Section(
         "iPhone",
         "1. Open this page in Safari. On iOS 26 and later, Chrome, Edge and other browsers work too.",
         "2. Tap the Share button (the square with an arrow pointing up). In Safari it's at the bottom of the screen, or behind the ⋯ button.",
         "3. Scroll down and tap Add to Home Screen.",
         "4. If you see an \"Open as Web App\" switch, leave it on. Tap Add.",
-        "5. From now on, open Off-Season from its icon, not from the browser.",
+        "5. From now on, open DBAP from its icon, not from the browser.",
         note = "Important: your plan is saved on the Home Screen version. If you set it up in the browser first and then add it to your Home Screen, use Settings › Export in the browser and Import in the Home Screen app.",
     )
     Section(
@@ -394,7 +394,7 @@ fun InstallGuide() = Guide("Add Off-Season to your Home Screen") {
 
 @Composable
 fun TrainerHelp() = Guide("Getting sessions onto your trainer") {
-    P { Text("Off-Season creates workout files in two formats: .zwo for Zwift and MyWhoosh, and .mrc for ROUVY and TrainingPeaks Virtual. Targets are a percentage of FTP, so the watts scale to the FTP set in that app. Keep your FTP the same in both places.") }
+    P { Text("DBAP creates workout files in two formats: .zwo for Zwift and MyWhoosh, and .mrc for ROUVY and TrainingPeaks Virtual. Targets are a percentage of FTP, so the watts scale to the FTP set in that app. Keep your FTP the same in both places.") }
     Section(
         "1. Get the files to your trainer computer",
         "For the whole week: tap \"Week's sessions\" on the This Week screen. For one session: open it and tap the button for your app.",
@@ -410,7 +410,7 @@ fun TrainerHelp() = Guide("Getting sessions onto your trainer") {
 
 @Composable
 fun FeelHelp() = Guide("Rating sessions & easing off") {
-    P { Text("After each ride, open the session and tap Mark done. Then pick how it felt. This is how Off-Season knows whether the plan suits you.") }
+    P { Text("After each ride, open the session and tap Mark done. Then pick how it felt. This is how DBAP knows whether the plan suits you.") }
     Section(
         "What to pick",
         "Easy: you could have done more.",
@@ -421,7 +421,7 @@ fun FeelHelp() = Guide("Rating sessions & easing off") {
     )
     Section(
         "When sessions keep feeling too hard",
-        "If two interval sessions in a row are rated Hard or Couldn't finish, Off-Season offers three choices:",
+        "If two interval sessions in a row are rated Hard or Couldn't finish, DBAP offers three choices:",
         "• Lower my targets: every session from tomorrow is ${Adaptation.EASE_PCT}% easier. This lasts until your next FTP test, which sets new targets anyway.",
         "• Repeat this week: do this week again before moving on. The rest of the plan, including retests, moves back a week.",
         "• No thanks: carry on as planned. Sometimes a hard week is just a hard week.",
@@ -432,10 +432,10 @@ fun FeelHelp() = Guide("Rating sessions & easing off") {
 
 @Composable
 fun FitHelp() = Guide("Adding your ride files (.fit)") {
-    P { Text("This is optional. Every app you ride with saves a .fit file of your ride. Give it to Off-Season and it reads your real power, so your progress and fitness trend are based on what you actually did, not just the plan.") }
+    P { Text("This is optional. Every app you ride with saves a .fit file of your ride. Give it to DBAP and it reads your real power, so your progress and fitness trend are based on what you actually did, not just the plan.") }
     Section(
         "How to add one",
-        "Open the session in Off-Season and tap \"Add ride file (.fit)\". Then pick the file: on iPhone, tap Browse to find it in Files, iCloud Drive or Downloads.",
+        "Open the session in DBAP and tap \"Add ride file (.fit)\". Then pick the file: on iPhone, tap Browse to find it in Files, iCloud Drive or Downloads.",
         "Got the file in Mail or WhatsApp? Save it to Files first (tap it, then Share › Save to Files), then add it as above.",
         note = "Zip files from Garmin Connect work too. No need to unzip.",
     )

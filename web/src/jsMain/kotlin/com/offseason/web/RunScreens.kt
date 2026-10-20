@@ -244,7 +244,7 @@ fun RunHelp(lthr: Int?) = Div({ classes("app", "stack") }) {
     Card {
         Div({ classes("tight") }) {
             H3 { Text("Getting sessions onto your watch") }
-            P { Text("For now, check the session in Off-Season before you head out. Most runs are a single easy zone. For quality sessions, set your watch's heart-rate alert to the zone shown, or build the workout in your watch's own app.") }
+            P { Text("For now, check the session in DBAP before you head out. Most runs are a single easy zone. For quality sessions, set your watch's heart-rate alert to the zone shown, or build the workout in your watch's own app.") }
             Muted("Sending runs straight to Garmin, COROS and others is planned for a later version.")
         }
     }

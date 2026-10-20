@@ -1,4 +1,4 @@
-// Off-Season service worker: keeps the app working with no signal (e.g. in the garage).
+// DBAP service worker: keeps the app working with no signal (e.g. in the garage).
 // Network first, so testers always get the newest version when online; cache as the fallback.
 // Bump VERSION when releasing so old caches are cleared.
 const VERSION = 'offseason-0.3.0';

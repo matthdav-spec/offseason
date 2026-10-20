@@ -160,7 +160,7 @@ fun SessionDetailScreen(
             OutlinedButton(onClick = onAddRideFile, Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.UploadFile, null); Text("  Add ride file (.fit). Optional")
             }
-            Muted("Adding the .fit file from your ride gives Off-Season your real power, so your progress is more accurate. You don't have to: \"Mark done\" is fine too.")
+            Muted("Adding the .fit file from your ride gives DBAP your real power, so your progress is more accurate. You don't have to: \"Mark done\" is fine too.")
         }
     }
     if (askRpe) {
@@ -172,7 +172,7 @@ fun SessionDetailScreen(
                     Rpe.entries.forEach { r ->
                         OutlinedButton(onClick = { onMarkDone(r); askRpe = false }, Modifier.fillMaxWidth()) { Text(r.label) }
                     }
-                    Muted("Be honest! If sessions keep feeling too hard, Off-Season will offer to ease off.")
+                    Muted("Be honest! If sessions keep feeling too hard, DBAP will offer to ease off.")
                 }
             },
             confirmButton = {},

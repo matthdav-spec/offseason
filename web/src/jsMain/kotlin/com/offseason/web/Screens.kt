@@ -307,7 +307,7 @@ fun SessionScreen(plan: Plan, data: AppData, id: String) {
                         .onFailure { AppState.showToast(it.message ?: "Couldn't read that file.") }
                 }
             }
-            Muted("Adding the .fit file from your ride gives Off-Season your real power, so your progress is more accurate. You don't have to: \"Mark done\" is fine too.")
+            Muted("Adding the .fit file from your ride gives DBAP your real power, so your progress is more accurate. You don't have to: \"Mark done\" is fine too.")
         }
     }
 
@@ -315,7 +315,7 @@ fun SessionScreen(plan: Plan, data: AppData, id: String) {
         Div({ classes("dialog"); onClick { it.stopPropagation() } }) {
             H3 { Text("How did it feel?") }
             Rpe.entries.forEach { r -> Btn(r.label) { AppState.markDone(id, r); askRpe = false } }
-            Muted("Be honest! If sessions keep feeling too hard, Off-Season will offer to ease off.")
+            Muted("Be honest! If sessions keep feeling too hard, DBAP will offer to ease off.")
             Btn("Cancel", "text") { askRpe = false }
         }
     }

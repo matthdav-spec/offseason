@@ -18,10 +18,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- "Share" a .fit ride file to Off-Season from email, WhatsApp, Files or Drive.
+            <!-- "Share" a .fit ride file to DBAP from email, WhatsApp, Files or Drive.
                  Other apps label .fit files with all sorts of types, so we accept the common ones
                  and check the file contents ourselves. -->
-            <intent-filter android:label="Add ride to Off-Season">
+            <intent-filter android:label="Add ride to DBAP">
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/octet-stream" />
@@ -32,7 +32,7 @@
             </intent-filter>
 
             <!-- "Open with" a .fit file -->
-            <intent-filter android:label="Add ride to Off-Season">
+            <intent-filter android:label="Add ride to DBAP">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />

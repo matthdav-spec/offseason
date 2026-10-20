@@ -104,7 +104,7 @@ class LoadAndExportTest {
         assertEquals("720", interval.getNamedItem("OnDuration").nodeValue)
         assertEquals("0.91", interval.getNamedItem("OnPower").nodeValue)
         assertEquals("bike", doc.getElementsByTagName("sportType").item(0).textContent)
-        assertTrue(xml.contains("<author>Off-Season</author>"))
+        assertTrue(xml.contains("<author>DBAP</author>"))
     }
 
     @Test

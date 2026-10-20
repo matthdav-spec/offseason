@@ -307,7 +307,7 @@ fun SettingsScreen(
 fun TrainerHelpScreen() {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Getting sessions onto your trainer", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text("Off-Season creates workout files in two formats: .zwo for Zwift and MyWhoosh, and .mrc for ROUVY and TrainingPeaks Virtual. Targets are a percentage of FTP, so the watts scale to the FTP set in that app. Keep your FTP the same in both places.")
+        Text("DBAP creates workout files in two formats: .zwo for Zwift and MyWhoosh, and .mrc for ROUVY and TrainingPeaks Virtual. Targets are a percentage of FTP, so the watts scale to the FTP set in that app. Keep your FTP the same in both places.")
         SectionCard {
             Text("1. Get the files to your trainer computer", fontWeight = FontWeight.SemiBold)
             Text("For the whole week: tap \"Week's sessions\" on the This Week screen. For one session: open it and tap the button for your app. Email the file to yourself or save it to Google Drive, then open it on the PC, Mac or tablet you ride with. Unzip the week's zip first.")
@@ -337,7 +337,7 @@ fun TrainerHelpScreen() {
 fun FeelHelpScreen() {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Rating sessions & easing off", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text("After each ride, open the session and tap Mark done. Then pick how it felt. This is how Off-Season knows whether the plan suits you.")
+        Text("After each ride, open the session and tap Mark done. Then pick how it felt. This is how DBAP knows whether the plan suits you.")
         SectionCard {
             Text("What to pick", fontWeight = FontWeight.SemiBold)
             Text("Easy: you could have done more.")
@@ -348,7 +348,7 @@ fun FeelHelpScreen() {
         }
         SectionCard {
             Text("When sessions keep feeling too hard", fontWeight = FontWeight.SemiBold)
-            Text("If two interval sessions in a row are rated Hard or Couldn't finish, Off-Season offers three choices:")
+            Text("If two interval sessions in a row are rated Hard or Couldn't finish, DBAP offers three choices:")
             Text("• Lower my targets: every session from tomorrow is ${com.offseason.engine.Adaptation.EASE_PCT}% easier. This lasts until your next FTP test, which sets new targets anyway.")
             Text("• Repeat this week: do this week again before moving on. The rest of the plan, including retests, moves back a week.")
             Text("• No thanks: carry on as planned. Sometimes a hard week is just a hard week.")
@@ -365,11 +365,11 @@ fun FeelHelpScreen() {
 fun FitHelpScreen() {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Adding your ride files (.fit)", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text("This is optional. Every app you ride with saves a .fit file of your ride. Give it to Off-Season and it reads your real power, so your progress and fitness trend are based on what you actually did, not just the plan.")
+        Text("This is optional. Every app you ride with saves a .fit file of your ride. Give it to DBAP and it reads your real power, so your progress and fitness trend are based on what you actually did, not just the plan.")
         SectionCard {
             Text("Two ways to add one", fontWeight = FontWeight.SemiBold)
-            Text("1. Open the session in Off-Season and tap \"Add ride file (.fit)\". Then pick the file from your phone, Google Drive or Downloads.")
-            Text("2. Or find the file in another app (email, WhatsApp, Files or Drive), tap Share, and choose Off-Season. It suggests which session the ride belongs to.")
+            Text("1. Open the session in DBAP and tap \"Add ride file (.fit)\". Then pick the file from your phone, Google Drive or Downloads.")
+            Text("2. Or find the file in another app (email, WhatsApp, Files or Drive), tap Share, and choose DBAP. It suggests which session the ride belongs to.")
             Muted("Zip files from Garmin Connect work too. No need to unzip.")
         }
         SectionCard {
@@ -411,7 +411,7 @@ fun RunHelpScreen(lthr: Int?) {
         }
         SectionCard {
             Text("Getting sessions onto your watch", fontWeight = FontWeight.SemiBold)
-            Text("For now, check the session in Off-Season before you head out. Most runs are a single easy zone. For quality sessions, set your watch's heart-rate alert to the zone shown, or build the workout in your watch's own app.")
+            Text("For now, check the session in DBAP before you head out. Most runs are a single easy zone. For quality sessions, set your watch's heart-rate alert to the zone shown, or build the workout in your watch's own app.")
             Muted("Sending runs straight to Garmin, COROS and others is planned for a later version.")
         }
         SectionCard {
