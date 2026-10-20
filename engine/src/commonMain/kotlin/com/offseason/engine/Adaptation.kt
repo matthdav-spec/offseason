@@ -92,9 +92,12 @@ object WeekRepeats {
             runs = w.runs.map { r ->
                 r.copy(id = idPrefix + r.id, date = r.date.plusDays(days), weekIndex = newIndex)
             },
+            swims = w.swims.map { s ->
+                s.copy(id = idPrefix + s.id, date = s.date.plusDays(days), weekIndex = newIndex)
+            },
         )
     }
 
     /** Recovery weeks and weeks with a test can't be repeated: just carry on. */
-    fun canRepeat(week: PlanWeek): Boolean = !week.isRecovery && !week.hasRetest && !week.hasRunTest
+    fun canRepeat(week: PlanWeek): Boolean = !week.isRecovery && !week.hasRetest && !week.hasRunTest && !week.hasSwimTest
 }

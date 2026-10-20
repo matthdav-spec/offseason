@@ -149,6 +149,68 @@ object JointScheduler {
         return score
     }
 
+    // ---- Swims ----
+
+    /**
+     * Swimming barely loads the legs, so a CSS swim doesn't count towards "no two hard days in a
+     * row" (which protects legs). It does count towards this weekly limit on hard sessions.
+     */
+    const val MAX_HARD_DAYS_WITH_SWIM = 4
+
+    const val SWIM_ADDS_HARD_DAY_OVER_LIMIT = 200
+    const val SWIM_HARD_DAY_AFTER_LONG = 20
+    const val SWIM_HARD_ON_LONG_DAY = 10
+    const val SWIMS_BACK_TO_BACK = 2
+    const val SWIM_ON_LONG_DAY = 1
+
+    data class SwimSlot(val role: SwimRole, val isHard: Boolean, val isTest: Boolean = false)
+
+    /**
+     * Places the week's swims on swim days, after bike and run are placed. Swimming is low impact,
+     * so an easy swim fits any day, and a hard swim (CSS set or test) can sit next to a hard bike or
+     * run day. A hard swim avoids the day after the long ride or long run, the week stays within
+     * [MAX_HARD_DAYS_WITH_SWIM] hard days, and swims spread out through the week.
+     *
+     * @param hardDays days already hard from bike/run; @param longDays the long ride/run days.
+     */
+    fun placeSwims(
+        slots: List<SwimSlot>,
+        swimDays: Set<DayOfWeek>,
+        hardDays: Set<DayOfWeek>,
+        longDays: Set<DayOfWeek>,
+        weekStart: DayOfWeek,
+    ): Map<SwimRole, DayOfWeek> {
+        val days = swimDays.sortedBy { Scheduler.offset(weekStart, it) }
+        val kept = slots.take(days.size)
+        if (kept.isEmpty()) return emptyMap()
+        var best: List<DayOfWeek> = emptyList()
+        var bestScore = Int.MAX_VALUE
+        choose(days, kept.size) { cand ->
+            var score = 0
+            val allHard = hardDays + kept.indices.filter { kept[it].isHard }.map { cand[it] }
+            if (allHard.size > MAX_HARD_DAYS_WITH_SWIM) score += (allHard.size - MAX_HARD_DAYS_WITH_SWIM) * SWIM_ADDS_HARD_DAY_OVER_LIMIT
+            kept.forEachIndexed { i, slot ->
+                val d = cand[i]
+                if (slot.isHard) {
+                    if (longDays.any { dayBefore(it, d) }) score += SWIM_HARD_DAY_AFTER_LONG
+                    if (d in longDays) score += SWIM_HARD_ON_LONG_DAY
+                } else if (d in longDays) score += SWIM_ON_LONG_DAY
+                if (slot.isTest) score += (6 - Scheduler.offset(weekStart, d)) * TEST_PER_DAY_EARLY / 2
+            }
+            for (i in cand.indices) for (j in i + 1 until cand.size) if (Scheduler.adjacent(cand[i], cand[j])) score += SWIMS_BACK_TO_BACK
+            if (score < bestScore) { bestScore = score; best = cand }
+        }
+        val result = kept.map { it.role }.zip(best).toMap().toMutableMap()
+        return result
+    }
+
+    /**
+     * True if a hard swim on [day] would break the swim rules: more than [MAX_HARD_DAYS_WITH_SWIM]
+     * hard days, or the day after the long ride or run. Used to soften the swim to an aerobic set.
+     */
+    fun hardSwimBreaksRules(day: DayOfWeek, hardDays: Set<DayOfWeek>, longDays: Set<DayOfWeek>): Boolean =
+        (day !in hardDays && hardDays.size >= MAX_HARD_DAYS_WITH_SWIM) || longDays.any { dayBefore(it, day) }
+
     /** True if [a] is the day immediately before [b] (the week wraps). */
     private fun dayBefore(a: DayOfWeek, b: DayOfWeek) = (b.isoNumber - a.isoNumber + 7) % 7 == 1
 

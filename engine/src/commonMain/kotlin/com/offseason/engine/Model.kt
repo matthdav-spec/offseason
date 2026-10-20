@@ -126,9 +126,13 @@ data class PlanRequest(
     val schedule: AthleteSchedule,
     /** Null = no run plan (bike only, as in the original pilot). */
     val run: RunPlanRequest? = null,
+    /** Null = no swim plan. A coached swim plan schedules around [AthleteSchedule.swimDays] without planning swims. */
+    val swim: SwimPlanRequest? = null,
 ) {
     val hasBike: Boolean get() = schedule.bikeDays.isNotEmpty()
     val hasRun: Boolean get() = run != null
+    /** Swims are planned by the app (not by a coach). */
+    val hasSwim: Boolean get() = swim != null && !swim.coached
 }
 
 /** The role a session plays in the week. Also its priority order when days are short. */
@@ -161,12 +165,16 @@ data class PlanWeek(
     /** Planned runs this week (empty without a run plan). */
     val runs: List<PlannedRun> = emptyList(),
     val runBlock: RunBlock? = null,
+    /** Planned swims this week (empty without a swim plan, or when a coach sets the swims). */
+    val swims: List<PlannedSwim> = emptyList(),
 ) {
     val endDate: LocalDate get() = startDate.plusDays(6)
     val hasRetest: Boolean get() = sessions.any { it.workout.kind == SessionKind.FTP_TEST }
     val hasRunTest: Boolean get() = runs.any { it.workout.kind == RunKind.LTHR_TEST }
+    val hasSwimTest: Boolean get() = swims.any { it.workout.kind == SwimKind.CSS_TEST }
     val title: String
-        get() = (if (isRecovery) "Recovery week + " + listOfNotNull(if (hasRetest) "FTP" else null, if (hasRunTest) "LTHR" else null).joinToString(" & ").ifEmpty { "FTP" } + " test"
+        get() = (if (isRecovery) "Recovery week" + listOfNotNull(if (hasRetest) "FTP" else null, if (hasRunTest) "LTHR" else null, if (hasSwimTest) "CSS" else null)
+            .let { if (it.isEmpty()) "" else " + " + it.joinToString(" & ") + " test" }
         else if (sessions.isEmpty() && runBlock != null) "${runBlock.displayName}: week $weekInBlock"
         else "${blockType.displayName}: week $weekInBlock") + if (isRepeat) " (repeat)" else ""
 
@@ -178,9 +186,11 @@ data class Plan(val request: PlanRequest, val weeks: List<PlanWeek>) {
     val endDate: LocalDate get() = weeks.last().endDate
     val sessions: List<PlannedSession> get() = weeks.flatMap { it.sessions }
     val runs: List<PlannedRun> get() = weeks.flatMap { it.runs }
+    val swims: List<PlannedSwim> get() = weeks.flatMap { it.swims }
 
     fun session(id: String): PlannedSession? = sessions.firstOrNull { it.id == id }
     fun run(id: String): PlannedRun? = runs.firstOrNull { it.id == id }
+    fun swim(id: String): PlannedSwim? = swims.firstOrNull { it.id == id }
     fun weekFor(date: LocalDate): PlanWeek? = weeks.firstOrNull { it.contains(date) }
 }
 

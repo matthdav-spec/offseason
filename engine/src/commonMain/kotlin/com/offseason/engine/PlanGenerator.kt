@@ -10,14 +10,16 @@ package com.offseason.engine
  * - With the 2:1 cycle each block is 3 weeks long, so the plan is shorter (e.g. 12 → 9 weeks). The build weeks use
  *   the first two (gentler) steps of each block's progression.
  * - Each week starts on the weekday of [PlanRequest.startDate].
+ *   Swim (optional): Technique & aerobic → Endurance → CSS → Race-specific, with a CSS test in recovery weeks.
  * - Bike only: [Scheduler] (unchanged from the original pilot). Bike + run: [JointScheduler].
+ * - Swims are placed last, on swim days, around the bike and run (see [JointScheduler.placeSwims]).
  */
 object PlanGenerator {
 
     private val BLOCK_ORDER = listOf(BlockType.SWEET_SPOT, BlockType.THRESHOLD, BlockType.VO2, BlockType.RACE_SPECIFIC)
 
     fun generate(request: PlanRequest): Plan {
-        require(request.hasBike || request.hasRun) { "Choose at least one bike or run day" }
+        require(request.hasBike || request.hasRun || request.hasSwim) { "Choose at least one sport to plan" }
         val run = request.run
         if (run != null) require(run.runDays.isNotEmpty()) { "Choose at least one run day" }
         val weekStartDay = request.startDate.dayOfWeek
@@ -79,9 +81,27 @@ object PlanGenerator {
                         workout = runWorkouts.getValue(role),
                     )
                 }.sortedBy { it.date }
+                val swims = request.swim?.takeIf { !it.coached }?.let { swimReq ->
+                    val workouts2 = SwimLibrary.week(swimReq, blockIndex, weekInBlock.coerceAtMost(3), isRecovery)
+                    val priority2 = if (isRecovery) workouts2.keys.sortedByDescending { workouts2.getValue(it).kind == SwimKind.CSS_TEST } else workouts2.keys.toList()
+                    val hardDays = (sessions.filter { it.workout.isHard }.map { it.date.dayOfWeek } + runs.filter { it.workout.isHard }.map { it.date.dayOfWeek }).toSet()
+                    val longDays = (sessions.filter { it.role == SlotRole.LONG }.map { it.date.dayOfWeek } + runs.filter { it.role == RunRole.LONG }.map { it.date.dayOfWeek }).toSet()
+                    val placement = JointScheduler.placeSwims(
+                        priority2.map { r -> workouts2.getValue(r).let { JointScheduler.SwimSlot(r, it.isHard, it.kind == SwimKind.CSS_TEST) } },
+                        request.schedule.swimDays, hardDays, longDays, weekStartDay,
+                    )
+                    placement.map { (role, day) ->
+                        // If the swim days only allow a hard swim by breaking the swim rules, make it aerobic instead.
+                        // (Tests are kept: they're short, and recovery weeks have few hard sessions anyway.)
+                        var w = workouts2.getValue(role)
+                        if (w.kind == SwimKind.CSS_SET && JointScheduler.hardSwimBreaksRules(day, hardDays, longDays)) w = SwimLibrary.softened(w)
+                        PlannedSwim("$tag-SWIM_${role.name}", weekStart.plusDays(Scheduler.offset(weekStartDay, day)), weekIndex, role, w)
+                    }.sortedBy { it.date }
+                } ?: emptyList()
                 weeks += PlanWeek(
                     weekIndex, weekStart, blockIndex, block, weekInBlock, isRecovery, sessions,
                     runs = runs, runBlock = if (run != null) RunLibrary.BLOCK_ORDER[blockIndex] else null,
+                    swims = swims,
                 )
                 weekIndex++
             }
