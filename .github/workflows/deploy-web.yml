@@ -2,15 +2,16 @@
 #
 #   main      → https://matthdav-spec.github.io/offseason/              (the live pilot)
 #   run-plan  → https://matthdav-spec.github.io/offseason/run-preview/  (running-plan preview)
+#   dbap      → https://matthdav-spec.github.io/offseason/dbap/         (full swim/bike/run preview)
 #
-# GitHub Pages hosts one build per site, so every run builds BOTH branches and publishes them
+# GitHub Pages hosts one build per site, so every run builds ALL these branches and publishes them
 # together. A push to either branch updates the site; the other part is rebuilt unchanged.
 # Each branch's engine tests must pass before anything is published.
 name: Deploy web app
 
 on:
   push:
-    branches: [main, run-plan]
+    branches: [main, run-plan, dbap]
   workflow_dispatch:
 
 permissions:
@@ -34,6 +35,10 @@ jobs:
         with:
           ref: run-plan
           path: preview
+      - uses: actions/checkout@v4
+        with:
+          ref: dbap
+          path: dbap
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -51,6 +56,10 @@ jobs:
         working-directory: preview
         run: ./gradlew :engine:jvmTest :web:jsBrowserDistribution
 
+      - name: Test and build the DBAP preview
+        working-directory: dbap
+        run: ./gradlew :engine:jvmTest :web:jsBrowserDistribution
+
       - name: Put them together
         run: |
           mkdir site
@@ -62,6 +71,9 @@ jobs:
           # Name the preview differently on the Home Screen.
           sed -i 's/"name": "DBAP"/"name": "DBAP (run preview)"/; s/"short_name": "DBAP"/"short_name": "DBAP preview"/' site/run-preview/manifest.webmanifest
           sed -i 's/<meta name="apple-mobile-web-app-title" content="DBAP">/<meta name="apple-mobile-web-app-title" content="DBAP preview">/' site/run-preview/index.html
+          mkdir site/dbap
+          cp -r dbap/web/build/dist/js/productionExecutable/. site/dbap/
+          sed -i "s/const VERSION = 'offseason-/const VERSION = 'offseason-dbap-/" site/dbap/sw.js
 
       - uses: actions/upload-pages-artifact@v3
         with:
