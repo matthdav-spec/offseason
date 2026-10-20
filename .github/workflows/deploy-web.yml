@@ -1,4 +1,4 @@
-# Builds the Off-Season web app and publishes it to GitHub Pages.
+# Builds the DBAP web app and publishes it to GitHub Pages.
 #
 #   main      → https://matthdav-spec.github.io/offseason/              (the live pilot)
 #   run-plan  → https://matthdav-spec.github.io/offseason/run-preview/  (running-plan preview)
@@ -60,8 +60,8 @@ jobs:
           # Give the preview its own offline cache name, so it never clears the main app's cache.
           sed -i "s/const VERSION = 'offseason-/const VERSION = 'offseason-preview-/" site/run-preview/sw.js
           # Name the preview differently on the Home Screen.
-          sed -i 's/"name": "Off-Season"/"name": "Off-Season (run preview)"/; s/"short_name": "Off-Season"/"short_name": "OS preview"/' site/run-preview/manifest.webmanifest
-          sed -i 's/<meta name="apple-mobile-web-app-title" content="Off-Season">/<meta name="apple-mobile-web-app-title" content="OS preview">/' site/run-preview/index.html
+          sed -i 's/"name": "DBAP"/"name": "DBAP (run preview)"/; s/"short_name": "DBAP"/"short_name": "DBAP preview"/' site/run-preview/manifest.webmanifest
+          sed -i 's/<meta name="apple-mobile-web-app-title" content="DBAP">/<meta name="apple-mobile-web-app-title" content="DBAP preview">/' site/run-preview/index.html
 
       - uses: actions/upload-pages-artifact@v3
         with:
