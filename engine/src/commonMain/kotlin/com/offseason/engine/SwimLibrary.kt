@@ -33,12 +33,18 @@ object SwimLibrary {
     fun rolesFor(swimsPerWeek: Int): List<SwimRole> =
         listOf(SwimRole.MAIN, SwimRole.TECHNIQUE, SwimRole.EXTRA).take(swimsPerWeek)
 
-    /** The week's swims by role. [progressionWeek] is 1..3 in build weeks; ignored in recovery weeks. */
-    fun week(req: SwimPlanRequest, blockIndex: Int, progressionWeek: Int, isRecovery: Boolean): Map<SwimRole, SwimWorkout> {
+    /**
+     * The week's swims by role. [progressionWeek] is 1..3 in build weeks; ignored in recovery weeks.
+     * [firstCssWeek]: the athlete has just moved up from the build-up route, so this week opens with the CSS test.
+     */
+    fun week(
+        req: SwimPlanRequest, blockIndex: Int, progressionWeek: Int, isRecovery: Boolean, firstCssWeek: Boolean = false,
+    ): Map<SwimRole, SwimWorkout> {
         val prefix = "S${blockIndex + 1}" + (if (isRecovery) "R" else "W$progressionWeek")
         return rolesFor(req.swimsPerWeek).associateWith { role ->
             val w = when {
-                req.level == SwimLevel.BUILD_UP -> buildUp(prefix, role, blockIndex, progressionWeek, isRecovery)
+                req.level == SwimLevel.BUILD_UP -> buildUp(prefix, role, blockIndex, progressionWeek, isRecovery, startStep(req.startDistanceM))
+                firstCssWeek && role == SwimRole.MAIN -> cssTest("$prefix-M")
                 isRecovery -> when (role) {
                     SwimRole.MAIN -> cssTest("$prefix-M")
                     SwimRole.TECHNIQUE -> technique("$prefix-T", 0, recovery = true)
@@ -121,12 +127,25 @@ object SwimLibrary {
 
     // ---- Build-up route: for swimmers who can't yet swim 400 m continuously ----
 
+    /** Each rung: reps × distance, with rest as needed. The last rung is a continuous 400 m. */
+    val BUILD_UP_LADDER = listOf(
+        8 to 25, 10 to 25, 6 to 50, 8 to 50, 10 to 50, 6 to 100, 5 to 100,
+        4 to 150, 3 to 200, 2 to 250, 2 to 300, 1 to 400,
+    )
+
     /**
-     * Short repeats with plenty of rest, growing towards a continuous 400 m by the end of block 2.
-     * Then the CSS test, after which the athlete switches to the CSS route.
+     * Where to start on the ladder for someone who can swim [distanceM] without stopping:
+     * repeats of about half that distance, the usual way to build towards a longer continuous swim.
      */
-    private fun buildUp(prefix: String, role: SwimRole, block: Int, week: Int, isRecovery: Boolean): SwimWorkout {
-        val step = (block * 3 + (if (isRecovery) 2 else week - 1)).coerceAtMost(8)
+    fun startStep(distanceM: Int): Int =
+        if (distanceM <= 0) 0 else BUILD_UP_LADDER.indexOfFirst { it.second * 2 >= distanceM }.let { if (it < 0) BUILD_UP_LADDER.lastIndex else it }
+
+    /**
+     * Short repeats with plenty of rest, one rung longer each build week, up to a continuous 400 m.
+     * Recovery weeks have a "distance check"; once that reaches 400 m the athlete moves up to the CSS plan.
+     */
+    private fun buildUp(prefix: String, role: SwimRole, block: Int, week: Int, isRecovery: Boolean, start: Int): SwimWorkout {
+        val step = (start + block * 3 + (if (isRecovery) 2 else week - 1)).coerceAtMost(BUILD_UP_LADDER.lastIndex)
         if (role == SwimRole.TECHNIQUE) return session(
             "$prefix-T", "Technique basics", SwimKind.BUILD_UP,
             "Short drills to build a relaxed, efficient stroke, with plenty of rest. Use a kickboard or fins if they help. Good technique makes every other swim easier.",
@@ -139,14 +158,18 @@ object SwimLibrary {
         )
         if (isRecovery && role == SwimRole.MAIN) return session(
             "$prefix-M", "Distance check", SwimKind.BUILD_UP,
-            "Swim as far as you comfortably can without stopping (any stroke, any pace). Note the distance. When you can do 400 m, you're ready for the CSS test.",
+            "Swim as far as you comfortably can without stopping (any stroke, any pace), and note the distance. When you can do 400 m, you're ready to move up to the CSS plan.",
             listOf(SwimStep(SWIM, 400, EASY, label = "As far as you can, up to 400 m. Stop when you need to")),
         )
-        val (reps, dist) = listOf(
-            8 to 25, 10 to 25, 6 to 50, 8 to 50, 10 to 50, 6 to 100, 5 to 100, 4 to 150, 3 to 200,
-        )[step]
+        val (reps, dist) = BUILD_UP_LADDER[step]
+        val code = "$prefix-${if (role == SwimRole.MAIN) "M" else "X"}"
+        if (reps == 1) return session(
+            code, "Continuous ${dist} m", SwimKind.BUILD_UP,
+            "Your goal swim: $dist m without stopping, at an easy pace. If you manage it, you're ready to move up to the CSS plan. If not, stop, rest, and finish the distance.",
+            listOf(SwimStep(SWIM, dist, EASY, label = "Easy and relaxed. Long breath out under water")),
+        )
         return session(
-            "$prefix-${if (role == SwimRole.MAIN) "M" else "X"}", "Build-up ${reps} × ${dist} m", SwimKind.BUILD_UP,
+            code, "Build-up $reps × $dist m", SwimKind.BUILD_UP,
             "Short swims with as much rest as you need. Each week the swims get a little longer, building towards 400 m without stopping. Relax, breathe out under water, and don't race the clock.",
             listOf(SwimStep(REPEATS, dist, EASY, repeat = reps, restSec = 40, label = "Easy. Rest as long as you need between each")),
         )

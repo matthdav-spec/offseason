@@ -81,8 +81,13 @@ object PlanGenerator {
                         workout = runWorkouts.getValue(role),
                     )
                 }.sortedBy { it.date }
-                val swims = request.swim?.takeIf { !it.coached }?.let { swimReq ->
-                    val workouts2 = SwimLibrary.week(swimReq, blockIndex, weekInBlock.coerceAtMost(3), isRecovery)
+                val swims = request.swim?.takeIf { !it.coached }?.let { baseReq ->
+                    // Someone who has moved up from the build-up route follows the CSS route from that date,
+                    // opening with the CSS test. Earlier weeks stay as they were.
+                    val movedUp = baseReq.level == SwimLevel.BUILD_UP && baseReq.cssFrom != null && weekStart >= baseReq.cssFrom
+                    val swimReq = if (movedUp) baseReq.copy(level = SwimLevel.CSS) else baseReq
+                    val firstCssWeek = movedUp && weekStart.plusWeeks(-1) < baseReq.cssFrom!!
+                    val workouts2 = SwimLibrary.week(swimReq, blockIndex, weekInBlock.coerceAtMost(3), isRecovery, firstCssWeek)
                     val priority2 = if (isRecovery) workouts2.keys.sortedByDescending { workouts2.getValue(it).kind == SwimKind.CSS_TEST } else workouts2.keys.toList()
                     val hardDays = (sessions.filter { it.workout.isHard }.map { it.date.dayOfWeek } + runs.filter { it.workout.isHard }.map { it.date.dayOfWeek }).toSet()
                     val longDays = (sessions.filter { it.role == SlotRole.LONG }.map { it.date.dayOfWeek } + runs.filter { it.role == RunRole.LONG }.map { it.date.dayOfWeek }).toSet()

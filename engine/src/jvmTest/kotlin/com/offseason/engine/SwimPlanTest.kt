@@ -127,12 +127,44 @@ class SwimPlanTest {
         val plan = PlanGenerator.generate(request(level = SwimLevel.BUILD_UP))
         assertTrue(plan.swims.none { it.workout.kind == SwimKind.CSS_TEST || it.workout.kind == SwimKind.CSS_SET })
         val longest = plan.weeks.filterNot { it.isRecovery }.map { w ->
-            w.swims.first { it.role == SwimRole.MAIN }.workout.steps.filter { it.type == SwimStepType.REPEATS }.maxOf { it.distanceM }
+            w.swims.first { it.role == SwimRole.MAIN }.workout.steps.filter { it.type == SwimStepType.REPEATS || it.type == SwimStepType.SWIM }.maxOf { it.distanceM }
         }
         assertEquals(25, longest.first())
         assertTrue(longest.zipWithNext().all { (a, b) -> b >= a }, "swims only get longer: $longest")
-        assertTrue(longest.last() >= 150, "builds to longer swims: $longest")
+        assertEquals(400, longest.last(), "reaches a continuous 400 m: $longest")
         assertTrue(plan.weeks[3].swims.any { it.workout.name == "Distance check" })
+    }
+
+    @Test
+    fun `build-up route starts from how far she can swim today`() {
+        fun firstMain(startM: Int) = PlanGenerator.generate(request(level = SwimLevel.BUILD_UP).let {
+            it.copy(swim = it.swim!!.copy(startDistanceM = startM))
+        }).weeks[0].swims.first { it.role == SwimRole.MAIN }.workout.steps.first { it.type == SwimStepType.REPEATS }
+
+        assertEquals(25, firstMain(0).distanceM, "not sure: start with 25s")
+        assertEquals(25, firstMain(50).distanceM)
+        assertEquals(100, firstMain(200).distanceM, "can swim 200 m: start with 100s")
+        assertTrue(firstMain(300).distanceM >= 150, "nearly there: start with longer repeats")
+    }
+
+    @Test
+    fun `someone close to 400 m reaches a continuous 400 m swim within the first block or two`() {
+        val plan = PlanGenerator.generate(request(level = SwimLevel.BUILD_UP).let { it.copy(swim = it.swim!!.copy(startDistanceM = 250)) })
+        val firstContinuous = plan.weeks.indexOfFirst { w -> w.swims.any { it.workout.name == "Continuous 400 m" } }
+        assertTrue(firstContinuous in 0..6, "continuous 400 m in week ${firstContinuous + 1}")
+    }
+
+    @Test
+    fun `moving up to the CSS plan mid-way keeps earlier weeks and opens with the CSS test`() {
+        val base = request(level = SwimLevel.BUILD_UP)
+        val moveUpOn = base.startDate.plusWeeks(5) // start of week 6
+        val plan = PlanGenerator.generate(base.copy(swim = base.swim!!.copy(cssFrom = moveUpOn)))
+        assertTrue(plan.weeks.take(5).flatMap { it.swims }.all { it.workout.kind == SwimKind.BUILD_UP }, "earlier weeks unchanged")
+        assertEquals(SwimKind.CSS_TEST, plan.weeks[5].swims.first { it.role == SwimRole.MAIN }.workout.kind, "first CSS week opens with the test")
+        assertTrue(plan.weeks.drop(6).flatMap { it.swims }.none { it.workout.kind == SwimKind.BUILD_UP }, "CSS route from then on")
+        // Ids are unchanged for earlier weeks, so ticked-off swims stay ticked.
+        val before = PlanGenerator.generate(base)
+        assertEquals(before.weeks[2].swims.map { it.id }, plan.weeks[2].swims.map { it.id })
     }
 
     @Test
