@@ -122,8 +122,6 @@ data class SwimPlanRequest(
     val level: SwimLevel,
     /** Pool length in metres (25 or 50). Set distances are rounded to whole lengths. */
     val poolLengthM: Int = 25,
-    /** Swims come from a coach: don't plan them, just schedule around [swimDays]. */
-    val coached: Boolean = false,
     /** Build-up route: how far the athlete can swim without stopping today (0 = not sure). Sets the starting point. */
     val startDistanceM: Int = 0,
     /** Build-up route: the athlete moved up to the CSS plan on this date. Weeks starting on or after it use the CSS route. */

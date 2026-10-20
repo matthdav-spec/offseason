@@ -231,8 +231,7 @@ fun SettingsScreen(data: AppData) {
     var runHours by remember(p) { mutableStateOf(p.runHoursPerWeek) }
     var swimsPerWeek by remember(p) { mutableStateOf(p.swimsPerWeek) }
     var pool by remember(p) { mutableStateOf(p.poolLengthM) }
-    var coached by remember(p) { mutableStateOf(p.swimCoached) }
-    val swimming = p.swimPlan || p.swimCoached
+    val swimming = p.swimPlan
     var weightText by remember(p) { mutableStateOf(p.weightKg?.toString() ?: "") }
     var wkg by remember(p) { mutableStateOf(p.showWattsPerKg) }
     var confirmReset by remember { mutableStateOf(false) }
@@ -247,8 +246,6 @@ fun SettingsScreen(data: AppData) {
         runHoursPerWeek = runHours,
         swimsPerWeek = swimsPerWeek,
         poolLengthM = pool,
-        swimCoached = swimming && coached,
-        swimPlan = swimming && !coached,
         weightKg = weightText.toDoubleOrNull(),
         showWattsPerKg = wkg,
     )
@@ -306,11 +303,8 @@ fun SettingsScreen(data: AppData) {
                 }
                 P { Text("Swim days") }; DayPicker(swim, { swim = it })
                 if (swimming) {
-                    Chips(listOf("DBAP plans my swims" to !coached, "A coach sets my swims" to coached)) { coached = it == 1 }
-                    if (!coached) {
-                        P { Text("Swims per week") }; Chips(listOf(1, 2, 3).map { "$it" to (swimsPerWeek == it) }) { swimsPerWeek = it + 1 }
-                        P { Text("Pool length") }; Chips(listOf("25 m" to (pool == 25), "50 m" to (pool == 50))) { pool = if (it == 0) 25 else 50 }
-                    }
+                    P { Text("Swims per week") }; Chips(listOf(1, 2, 3).map { "$it" to (swimsPerWeek == it) }) { swimsPerWeek = it + 1 }
+                    P { Text("Pool length") }; Chips(listOf("25 m" to (pool == 25), "50 m" to (pool == 50))) { pool = if (it == 0) 25 else 50 }
                 }
                 if (p.runPlan) { P { Text("Run hours") }; Chips(listOf(2, 3, 4).map { "$it h" to (runHours == it) }) { runHours = it + 2 } }
                 P { Text(if (p.runPlan) "Days you can run" else "Run days") }; DayPicker(run, { run = it })

@@ -283,7 +283,6 @@ fun SwimHelp(css: Int?) = Div({ classes("app", "stack") }) {
             P { Text("• Breathe out steadily under water, so you only need to breathe in when you turn your head.") }
             P { Text("• Count strokes per length on the easy swims. Fewer strokes at the same effort means better technique.") }
             P { Text("• Use the pace clock on the wall for rests, or just count breaths.") }
-            P { Text("• If you have a swim coach, their sessions come first. Settings › Your week lets DBAP plan around them instead.") }
         }
     }
 }

@@ -54,7 +54,6 @@ fun Onboarding() {
     var doBike by remember { mutableStateOf(true) }
     var doRun by remember { mutableStateOf(false) }
     var doSwim by remember { mutableStateOf(false) }
-    var swimMode by remember { mutableStateOf("plan") } // "plan" or "coach"
     var swimsPerWeek by remember { mutableStateOf(2) }
     var pool by remember { mutableStateOf(25) }
     var canSwim400 by remember { mutableStateOf(false) }
@@ -100,7 +99,7 @@ fun Onboarding() {
                 lthrText, { lthrText = it.filter(Char::isDigit).take(3) }, needsLthrTest, { needsLthrTest = it },
             )
             3 -> YourWeek(
-                doBike, doRun, doSwim, swimMode, { swimMode = it }, swimsPerWeek, { swimsPerWeek = it }, pool, { pool = it },
+                doBike, doRun, doSwim, swimsPerWeek, { swimsPerWeek = it }, pool, { pool = it },
                 canSwim400, { canSwim400 = it }, swimStartM, { swimStartM = it },
                 hours, { hours = it }, runHours, { runHours = it }, bike, { bike = it }, swim, { swim = it },
                 run, { run = it; if (longRun !in it) longRun = null; hardRuns = hardRuns intersect it },
@@ -129,8 +128,7 @@ fun Onboarding() {
                         readiness = readiness.toMap(),
                         runPlan = doRun,
                         runHoursPerWeek = runHours,
-                        swimPlan = doSwim && swimMode == "plan",
-                        swimCoached = doSwim && swimMode == "coach",
+                        swimPlan = doSwim,
                         swimsPerWeek = swimsPerWeek,
                         poolLengthM = pool,
                         swimLevel = if (canSwim400) "CSS" else "BUILD_UP",
@@ -265,7 +263,6 @@ private fun AboutYou(
 @Composable
 private fun YourWeek(
     doBike: Boolean, doRun: Boolean, doSwim: Boolean,
-    swimMode: String, onSwimMode: (String) -> Unit,
     swimsPerWeek: Int, onSwimsPerWeek: (Int) -> Unit,
     pool: Int, onPool: (Int) -> Unit,
     canSwim400: Boolean, onCanSwim400: (Boolean) -> Unit,
@@ -294,7 +291,7 @@ private fun YourWeek(
         DayPicker(bike, onBike)
         if (bike.size < needed) Muted("Pick $needed days for the full plan. With fewer, we'll keep the most important sessions.")
     }
-    if (doSwim) SwimWeek(swimMode, onSwimMode, swimsPerWeek, onSwimsPerWeek, pool, onPool, canSwim400, onCanSwim400, swimStartM, onSwimStartM, swim, onSwim)
+    if (doSwim) SwimWeek(swimsPerWeek, onSwimsPerWeek, pool, onPool, canSwim400, onCanSwim400, swimStartM, onSwimStartM, swim, onSwim)
     else {
         H3 { Text("Which days do you swim?") }
         DayPicker(swim, onSwim)
@@ -387,21 +384,12 @@ private fun YourPlan(
 
 @Composable
 private fun SwimWeek(
-    mode: String, onMode: (String) -> Unit,
     perWeek: Int, onPerWeek: (Int) -> Unit,
     pool: Int, onPool: (Int) -> Unit,
     can400: Boolean, onCan400: (Boolean) -> Unit,
     startM: Int, onStartM: (Int) -> Unit,
     days: Set<DayOfWeek>, onDays: (Set<DayOfWeek>) -> Unit,
 ) {
-    H3 { Text("Swimming") }
-    Chips(listOf("Plan my swims" to (mode == "plan"), "A coach sets my swims" to (mode == "coach"))) { onMode(if (it == 0) "plan" else "coach") }
-    if (mode == "coach") {
-        Muted("DBAP won't plan your swims, but will plan your bike and run around your swim days.")
-        H3 { Text("Which days do you swim?") }
-        DayPicker(days, onDays)
-        return
-    }
     H3 { Text("Swims per week") }
     Chips(listOf(1, 2, 3).map { "$it" to (perWeek == it) }) { onPerWeek(it + 1) }
     H3 { Text("Which days can you swim?") }

@@ -81,7 +81,7 @@ object PlanGenerator {
                         workout = runWorkouts.getValue(role),
                     )
                 }.sortedBy { it.date }
-                val swims = request.swim?.takeIf { !it.coached }?.let { baseReq ->
+                val swims = request.swim?.let { baseReq ->
                     // Someone who has moved up from the build-up route follows the CSS route from that date,
                     // opening with the CSS test. Earlier weeks stay as they were.
                     val movedUp = baseReq.level == SwimLevel.BUILD_UP && baseReq.cssFrom != null && weekStart >= baseReq.cssFrom

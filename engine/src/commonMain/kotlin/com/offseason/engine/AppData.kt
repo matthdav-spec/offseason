@@ -72,8 +72,6 @@ data class Profile(
     val swimStartDistanceM: Int = 0,
     /** Moved up from the build-up route to the CSS plan on this date (ISO), if they have. */
     val swimCssFrom: String? = null,
-    /** Swims come from a coach: plan bike and run around swim days, don't plan swims. */
-    val swimCoached: Boolean = false,
     /** The athlete's target race, e.g. "IRONMAN 70.3 Cascais". Shown as a countdown. */
     val raceName: String? = null,
     /** ISO date of the target race. */
@@ -98,12 +96,11 @@ data class Profile(
             runDays = runDays.map(::dayOfWeekFromIso).toSet(),
             preferredLongRunDay = longRunDay?.let(::dayOfWeekFromIso),
         ) else null,
-        swim = if (swimPlan || swimCoached) SwimPlanRequest(
+        swim = if (swimPlan) SwimPlanRequest(
             swimsPerWeek = swimsPerWeek.coerceIn(1, 3),
             swimDays = swimDays.map(::dayOfWeekFromIso).toSet(),
             level = SwimLevel.valueOf(swimLevel),
             poolLengthM = poolLengthM,
-            coached = swimCoached,
             startDistanceM = swimStartDistanceM,
             cssFrom = swimCssFrom?.let(LocalDate::parse),
         ) else null,
@@ -294,7 +291,7 @@ object AppLogic {
     /** Ready to leave the build-up route? (Has swum 400 m without stopping and isn't on the CSS plan yet.) */
     fun readyToMoveUp(d: AppData): Boolean {
         val p = d.profile ?: return false
-        return p.swimPlan && !p.swimCoached && p.swimLevel == SwimLevel.BUILD_UP.name && p.swimCssFrom == null &&
+        return p.swimPlan && p.swimLevel == SwimLevel.BUILD_UP.name && p.swimCssFrom == null &&
             (d.bestContinuousM ?: 0) >= 400
     }
 

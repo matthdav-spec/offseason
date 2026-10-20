@@ -25,7 +25,6 @@ class SwimPlanTest {
         swims: Int = 2,
         level: SwimLevel = SwimLevel.CSS,
         swimDays: Set<DayOfWeek> = setOf(MONDAY, WEDNESDAY, FRIDAY),
-        coached: Boolean = false,
         pool: Int = 25,
         bikeDays: Set<DayOfWeek> = setOf(TUESDAY, THURSDAY, SATURDAY, SUNDAY),
         runDays: Set<DayOfWeek>? = setOf(MONDAY, WEDNESDAY, FRIDAY, SUNDAY),
@@ -33,7 +32,7 @@ class SwimPlanTest {
         monday, PlanLength.WEEKS_16, HoursBucket.FOUR, RecoveryCycle.THREE_ONE,
         AthleteSchedule(bikeDays = bikeDays, swimDays = swimDays),
         run = runDays?.let { RunPlanRequest(RunHours.THREE, it) },
-        swim = SwimPlanRequest(swims, swimDays, level, pool, coached),
+        swim = SwimPlanRequest(swims, swimDays, level, pool),
     )
 
     /** Hard bike and run days: the leg-loading ones that must never be back to back. */
@@ -171,16 +170,6 @@ class SwimPlanTest {
     fun `build-up sessions are gentle in volume`() {
         val plan = PlanGenerator.generate(request(level = SwimLevel.BUILD_UP))
         plan.swims.forEach { assertTrue(it.workout.distanceM <= 1000, "${it.workout.name}: ${it.workout.distanceM} m") }
-    }
-
-    // ---- Coached ----
-
-    @Test
-    fun `coached swims are not planned, but bike and run still plan around swim days`() {
-        val plan = PlanGenerator.generate(request(coached = true))
-        assertTrue(plan.swims.isEmpty())
-        assertTrue(plan.sessions.isNotEmpty() && plan.runs.isNotEmpty())
-        assertFalse(plan.request.hasSwim)
     }
 
     // ---- Three-sport scheduling ----

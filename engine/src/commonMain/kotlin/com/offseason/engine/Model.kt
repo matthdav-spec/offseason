@@ -126,13 +126,12 @@ data class PlanRequest(
     val schedule: AthleteSchedule,
     /** Null = no run plan (bike only, as in the original pilot). */
     val run: RunPlanRequest? = null,
-    /** Null = no swim plan. A coached swim plan schedules around [AthleteSchedule.swimDays] without planning swims. */
+    /** Null = no swim plan. */
     val swim: SwimPlanRequest? = null,
 ) {
     val hasBike: Boolean get() = schedule.bikeDays.isNotEmpty()
     val hasRun: Boolean get() = run != null
-    /** Swims are planned by the app (not by a coach). */
-    val hasSwim: Boolean get() = swim != null && !swim.coached
+    val hasSwim: Boolean get() = swim != null
 }
 
 /** The role a session plays in the week. Also its priority order when days are short. */
@@ -165,7 +164,7 @@ data class PlanWeek(
     /** Planned runs this week (empty without a run plan). */
     val runs: List<PlannedRun> = emptyList(),
     val runBlock: RunBlock? = null,
-    /** Planned swims this week (empty without a swim plan, or when a coach sets the swims). */
+    /** Planned swims this week (empty without a swim plan). */
     val swims: List<PlannedSwim> = emptyList(),
 ) {
     val endDate: LocalDate get() = startDate.plusDays(6)

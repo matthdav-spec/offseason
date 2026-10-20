@@ -96,7 +96,7 @@ fun ThisWeekScreen(plan: Plan, data: AppData, today: LocalDate, status: Status.M
                         Text((if (isToday) "Today · " else "") + date.shortDay())
                     }
                     val o = otherSports(date.dayOfWeek, schedule, planned = hasRun, swimsPlanned = hasSwim)
-                    if (o.isNotEmpty()) Span({ classes("other") }) { Text(if (plan.request.swim?.coached == true) o.replace("Swim", "Swim (coach)") else o) }
+                    if (o.isNotEmpty()) Span({ classes("other") }) { Text(o) }
                 }
                 val other = otherSports(date.dayOfWeek, schedule, planned = hasRun, swimsPlanned = hasSwim)
                 val sessions = week.sessions.filter { it.date == date }
