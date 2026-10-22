@@ -41,7 +41,7 @@ p { margin: 0; }
 .muted { color: var(--muted); font-size: 14px; }
 .small { font-size: 13px; }
 .brand { color: var(--primary); font-size: 40px; font-weight: 800; margin: 4px 0 0; }
-.logo { display: block; width: 150px; height: auto; margin: 20px 0 0; }
+.wordmark { display: block; width: 220px; max-width: 70%; height: auto; margin: 24px 0 4px; }
 .stack > * + * { margin-top: 12px; }
 .tight > * + * { margin-top: 6px; }
 .row { display: flex; align-items: center; gap: 10px; }

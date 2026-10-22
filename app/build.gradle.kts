@@ -13,8 +13,8 @@ android {
         applicationId = "com.offseason.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 5
-        versionName = "1.0.1"
+        versionCode = 6
+        versionName = "1.0.2"
     }
 
     buildTypes {

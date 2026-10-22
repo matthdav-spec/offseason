@@ -147,8 +147,7 @@ fun Onboarding() {
 
 @Composable
 private fun Welcome() {
-    Img("logo.svg", "DBAP logo", { classes("logo") })
-    P({ classes("brand") }) { Text("DBAP") }
+    Img("wordmark.png", "DBAP", { classes("wordmark") })
     H2 { Text("Turn this winter into a stronger triathlete.") }
     P {
         Text(
