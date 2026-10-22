@@ -11,12 +11,16 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -29,6 +33,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -39,10 +44,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -88,7 +99,12 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) handleSharedFile(intent)
         setContent {
             OffSeasonTheme {
-                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { App(vm) }
+                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    // The DBAP badge for 4 seconds each time the app opens (not on rotation).
+                    var splash by rememberSaveable { mutableStateOf(savedInstanceState == null) }
+                    LaunchedEffect(Unit) { delay(4000); splash = false }
+                    if (splash) SplashScreen() else App(vm)
+                }
             }
         }
     }
@@ -107,6 +123,23 @@ class MainActivity : ComponentActivity() {
         } ?: return
         readRideFrom(this, uri, vm).onSuccess(vm::setPendingRide)
             .onFailure { Toast.makeText(this, it.message, Toast.LENGTH_LONG).show() }
+    }
+}
+
+@Composable
+private fun SplashScreen() {
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { progress.animateTo(1f, tween(3800)) }
+    Column(
+        Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(36.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Image(painterResource(R.drawable.dbap_badge), contentDescription = "DBAP", modifier = Modifier.width(240.dp))
+        LinearProgressIndicator(
+            progress = { progress.value }, modifier = Modifier.width(140.dp),
+            color = Color(0xFFE53935), trackColor = MaterialTheme.colorScheme.surfaceVariant,
+        )
     }
 }
 

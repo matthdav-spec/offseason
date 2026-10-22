@@ -19,10 +19,17 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<!-- Splash: the DBAP badge for 4 seconds each time the app opens. Plain HTML so it shows instantly. -->
+<div id="splash"><img src="badge.png" alt="DBAP"><div class="splash-bar"><div></div></div></div>
 <div id="root"></div>
 <noscript>DBAP needs JavaScript turned on.</noscript>
 <script src="offseason.js"></script>
 <script>
+    setTimeout(() => {
+        const s = document.getElementById('splash');
+        s.classList.add('gone');
+        setTimeout(() => s.remove(), 500);
+    }, 4000);
     // Works offline after the first visit.
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
