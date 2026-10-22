@@ -170,7 +170,7 @@ fun OnboardingScreen(
 @Composable
 private fun WelcomePage() {
     Image(painterResource(R.drawable.dbap_wordmark), contentDescription = "DBAP", modifier = Modifier.padding(top = 12.dp).width(220.dp))
-    Text("Turn this winter into a stronger triathlete.", style = MaterialTheme.typography.titleLarge)
+    Text("Built Different", style = MaterialTheme.typography.titleLarge)
     Text(
         "A structured winter plan for the bike, the run, or both. Raise your FTP indoors on 3–5 hours a week, and " +
             "build your running with heart-rate zones, all scheduled around each other and your swimming.",

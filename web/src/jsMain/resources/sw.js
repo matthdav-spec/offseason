@@ -1,7 +1,7 @@
 // DBAP service worker: keeps the app working with no signal (e.g. in the garage).
 // Network first, so testers always get the newest version when online; cache as the fallback.
 // Bump VERSION when releasing so old caches are cleared.
-const VERSION = 'offseason-1.0.2';
+const VERSION = 'offseason-1.0.3';
 const FILES = ['./', 'index.html', 'offseason.js', 'styles.css', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'badge.png', 'wordmark.png'];
 
 self.addEventListener('install', (e) => {

@@ -148,7 +148,7 @@ fun Onboarding() {
 @Composable
 private fun Welcome() {
     Img("wordmark.png", "DBAP", { classes("wordmark") })
-    H2 { Text("Turn this winter into a stronger triathlete.") }
+    H2 { Text("Built Different") }
     P {
         Text(
             "A structured winter plan for swim, bike and run: pick any or all three. Pool sessions built on your swim pace, " +
