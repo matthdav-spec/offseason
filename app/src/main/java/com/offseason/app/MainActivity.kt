@@ -81,6 +81,9 @@ import com.offseason.app.ui.TrainerHelpScreen
 import com.offseason.app.ui.RunHelpScreen
 import com.offseason.app.ui.LthrTestScreen
 import com.offseason.app.ui.RunDetailScreen
+import com.offseason.app.ui.CssTestScreen
+import com.offseason.app.ui.SwimDetailScreen
+import com.offseason.app.ui.SwimHelpScreen
 import com.offseason.app.ui.minutesLabel
 import com.offseason.app.ui.theme.OffSeasonTheme
 import com.offseason.engine.Plan
@@ -164,6 +167,8 @@ private fun titleFor(route: String?) = when {
     route == null -> ""
     route.startsWith("ftp") -> "FTP test"
     route.startsWith("lthr") -> "LTHR test"
+    route.startsWith("css") -> "CSS test"
+    route.startsWith("swim") -> "Swim"
     route.startsWith("run") -> "Run"
     route.startsWith("help") -> "How-to"
     else -> "Session"
@@ -246,12 +251,14 @@ fun App(vm: AppViewModel) {
                     currentPlan, data, today, status.message,
                     onOpenSession = { nav.navigate("session/$it") },
                     onOpenRun = { nav.navigate("run/$it") },
+                    onOpenSwim = { nav.navigate("swim/$it") },
+                    onMoveUp = { vm.moveUpToCss(); Toast.makeText(context, "Moved up. Next week starts with your CSS test.", Toast.LENGTH_LONG).show() },
                     onDownloadWeek = { Sharing.shareWeek(context, it) },
                     onFtpTest = { nav.navigate("ftp") },
                     onLthrTest = { nav.navigate("lthr") },
                 )
             }
-            composable("plan") { PlanOverviewScreen(currentPlan, data, today, { nav.navigate("session/$it") }, { nav.navigate("run/$it") }) }
+            composable("plan") { PlanOverviewScreen(currentPlan, data, today, { nav.navigate("session/$it") }, { nav.navigate("run/$it") }, { nav.navigate("swim/$it") }) }
             composable("progress") {
                 ProgressScreen(currentPlan, data, today, status.message, status.series, vm.completionRate(currentPlan, data, today))
             }
@@ -271,6 +278,29 @@ fun App(vm: AppViewModel) {
             composable("help/feel") { FeelHelpScreen() }
             composable("help/fit") { FitHelpScreen() }
             composable("help/run") { RunHelpScreen(data.currentLthr) }
+            composable("help/swim") { SwimHelpScreen(data.currentCss) }
+            composable("swim/{id}") { entry ->
+                val swim = currentPlan.swim(entry.arguments?.getString("id") ?: "") ?: return@composable
+                SwimDetailScreen(
+                    swim, data,
+                    onMarkDone = { vm.markDone(swim.id, it) },
+                    onUndo = { vm.unmarkDone(swim.id) },
+                    onTest = { nav.navigate("css?swim=${swim.id}") },
+                    onDistance = vm::recordSwimDistance,
+                    readyToMoveUp = vm.readyToMoveUp(data),
+                    onMoveUp = { vm.moveUpToCss(); Toast.makeText(context, "Moved up. Next week starts with your CSS test.", Toast.LENGTH_LONG).show() },
+                )
+            }
+            composable(
+                "css?swim={swim}",
+                arguments = listOf(navArgument("swim") { type = NavType.StringType; nullable = true; defaultValue = null }),
+            ) { entry ->
+                CssTestScreen(
+                    data, entry.arguments?.getString("swim"),
+                    onSave = { css, t400, t200 -> vm.recordCss(css, t400, t200) },
+                    onMarkTestDone = { id -> if (id !in vm.data.value.completions) vm.markDone(id, Rpe.HARD) },
+                )
+            }
             composable("run/{id}") { entry ->
                 val run = currentPlan.run(entry.arguments?.getString("id") ?: "") ?: return@composable
                 RunDetailScreen(

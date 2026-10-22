@@ -50,6 +50,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---- Actions ----
 
     fun completeOnboarding(profile: Profile, ftp: Int?, lthr: Int?) = update { AppLogic.completeOnboarding(profile, ftp, lthr, today()) }
+    fun recordCss(cssSec: Int, t400: Int?, t200: Int?) = update { AppLogic.recordCss(it, cssSec, t400, t200, today()) }
+    fun recordSwimDistance(m: Int) = update { AppLogic.recordSwimDistance(it, m, today()) }
+    fun moveUpToCss() = update { d -> _plan.value?.let { AppLogic.moveUpToCss(d, it, today()) } ?: d }
+    fun readyToMoveUp(d: AppData) = AppLogic.readyToMoveUp(d)
     fun updateProfile(profile: Profile) = update { it.copy(profile = profile) }
     fun recordFtp(ftp: Int, source: String) = update { AppLogic.recordFtp(it, ftp, source, today()) }
     fun recordLthr(lthr: Int, source: String) = update { AppLogic.recordLthr(it, lthr, source, today()) }

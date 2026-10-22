@@ -67,6 +67,7 @@ fun ProgressScreen(
         Text("Your progress", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         TrafficLight(status)
 
+        if (plan.request.hasSwim) SwimProgressCard(plan, data)
         if (plan.request.hasRun) LthrCard(plan, data)
 
         if (plan.request.hasBike) SectionCard {
@@ -157,7 +158,8 @@ private fun FitnessLine(series: List<Load.DayLoad>) {
     }
 }
 
-private fun canSave(p: Profile) = (!p.bikePlan || p.bikeDays.isNotEmpty()) && (!p.runPlan || p.runDays.isNotEmpty())
+private fun canSave(p: Profile) = (!p.bikePlan || p.bikeDays.isNotEmpty()) && (!p.runPlan || p.runDays.isNotEmpty()) &&
+    (!p.swimPlan || p.swimDays.isNotEmpty())
 
 /** Screen 8: settings. */
 @Composable
@@ -181,6 +183,8 @@ fun SettingsScreen(
     var ftpText by remember(data.currentFtp) { mutableStateOf(data.currentFtp?.toString() ?: "") }
     var lthrText by remember(data.currentLthr) { mutableStateOf(data.currentLthr?.toString() ?: "") }
     var runHours by remember(p) { mutableStateOf(p.runHoursPerWeek) }
+    var swimsPerWeek by remember(p) { mutableStateOf(p.swimsPerWeek) }
+    var pool by remember(p) { mutableStateOf(p.poolLengthM) }
     var weightText by remember(p) { mutableStateOf(p.weightKg?.toString() ?: "") }
     var wkg by remember(p) { mutableStateOf(p.showWattsPerKg) }
     var confirmReset by remember { mutableStateOf(false) }
@@ -193,6 +197,8 @@ fun SettingsScreen(
         hardRunDays = if (p.runPlan) emptyList() else (hard intersect run).map { it.isoNumber }.sorted(),
         longRunDay = longRun?.takeIf { it in run }?.isoNumber,
         runHoursPerWeek = runHours,
+        swimsPerWeek = swimsPerWeek,
+        poolLengthM = pool,
         weightKg = weightText.toDoubleOrNull(),
         showWattsPerKg = wkg,
     )
@@ -205,6 +211,7 @@ fun SettingsScreen(
             OutlinedButton(onClick = { onHelp("help/feel") }, Modifier.fillMaxWidth()) { Text("Rating sessions & easing off") }
             OutlinedButton(onClick = { onHelp("help/fit") }, Modifier.fillMaxWidth()) { Text("Adding your ride files (.fit)") }
             if (p.runPlan) OutlinedButton(onClick = { onHelp("help/run") }, Modifier.fillMaxWidth()) { Text("Running by heart rate") }
+            if (p.swimPlan) OutlinedButton(onClick = { onHelp("help/swim") }, Modifier.fillMaxWidth()) { Text("Swimming with DBAP") }
         }
 
         if (p.runPlan) SectionCard {
@@ -248,6 +255,10 @@ fun SettingsScreen(
                 Text("Bike days"); DayPicker(bike, { bike = it })
             }
             Text("Swim days"); DayPicker(swim, { swim = it })
+            if (p.swimPlan) {
+                Text("Swims per week"); ChoiceChips(listOf(1, 2, 3).map { "$it" to (swimsPerWeek == it) }) { swimsPerWeek = it + 1 }
+                Text("Pool length"); ChoiceChips(listOf("25 m" to (pool == 25), "50 m" to (pool == 50))) { pool = if (it == 0) 25 else 50 }
+            }
             if (p.runPlan) {
                 Text("Run hours"); ChoiceChips(listOf(2, 3, 4).map { "$it h" to (runHours == it) }) { runHours = it + 2 }
             }

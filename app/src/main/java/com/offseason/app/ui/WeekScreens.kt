@@ -58,6 +58,8 @@ fun ThisWeekScreen(
     status: Status.Message,
     onOpenSession: (String) -> Unit,
     onOpenRun: (String) -> Unit,
+    onOpenSwim: (String) -> Unit,
+    onMoveUp: () -> Unit,
     onDownloadWeek: (PlanWeek) -> Unit,
     onFtpTest: () -> Unit,
     onLthrTest: () -> Unit,
@@ -77,6 +79,8 @@ fun ThisWeekScreen(
                 },
             )
         }
+        if (data.profile?.raceName != null) item { RaceCountdown(data, today) }
+        if (AppLogic.readyToMoveUp(data)) item { MoveUpCard(onMoveUp) }
         if (hasRun && data.currentLthr == null) item {
             SectionCard {
                 Text("Find your LTHR", fontWeight = FontWeight.SemiBold)
@@ -101,7 +105,7 @@ fun ThisWeekScreen(
             }
         }
         items((0..6).map { week.startDate.plusDays(it.toLong()) }) { date ->
-            DayRow(date, week.sessions.filter { it.date == date }, week.runs.filter { it.date == date }, plan, data, ftp, isToday = date == today, onOpenSession, onOpenRun)
+            DayRow(date, week.sessions.filter { it.date == date }, week.runs.filter { it.date == date }, week.swims.filter { it.date == date }, plan, data, ftp, isToday = date == today, onOpenSession, onOpenRun, onOpenSwim)
         }
         if (hasBike) item {
             Muted("Download the rides, then load them into Zwift, MyWhoosh, ROUVY or TPV. See Settings › How-to guides.")
@@ -114,15 +118,18 @@ private fun DayRow(
     date: LocalDate,
     sessions: List<PlannedSession>,
     runs: List<com.offseason.engine.PlannedRun>,
+    swims: List<com.offseason.engine.PlannedSwim>,
     plan: Plan,
     data: AppData,
     ftp: Int?,
     isToday: Boolean,
     onOpen: (String) -> Unit,
     onOpenRun: (String) -> Unit,
+    onOpenSwim: (String) -> Unit,
 ) {
     val profile = data.profile
-    val other = otherSports(date.dayOfWeek, profile?.toPlanRequest()?.schedule, planned = plan.request.hasRun)
+    val req = plan.request
+    val other = otherSports(date.dayOfWeek, profile?.toPlanRequest()?.schedule, planned = req.hasRun, swimsPlanned = req.hasSwim)
     Card(
         colors = CardDefaults.cardColors(containerColor = if (isToday) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer),
         border = if (isToday) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
@@ -137,7 +144,23 @@ private fun DayRow(
                 )
                 if (other.isNotBlank()) Text(other, color = AppColors.greyedOut, style = MaterialTheme.typography.bodySmall)
             }
-            if (sessions.isEmpty() && runs.isEmpty()) Muted(if (plan.request.hasRun && plan.request.hasBike) "Rest day" else if (plan.request.hasRun) "No run" else "No bike session")
+            val sports = listOf(req.hasBike, req.hasRun, req.hasSwim).count { it }
+            if (sessions.isEmpty() && runs.isEmpty() && swims.isEmpty() && other.isEmpty()) Muted(
+                if (sports > 1) "Rest day" else if (req.hasRun) "No run" else if (req.hasSwim) "No swim" else "No bike session",
+            )
+            swims.forEach { sw ->
+                Row(
+                    Modifier.fillMaxWidth().clickable { onOpenSwim(sw.id) }.padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.width(6.dp).height(36.dp).background(swimKindColor(sw.workout.kind), RoundedCornerShape(3.dp)))
+                    Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                        Text("Swim · " + sw.workout.name, fontWeight = FontWeight.SemiBold)
+                        Muted("${sw.workout.distanceM} m · about ${sw.workout.estimatedMin(data.currentCss)} min")
+                    }
+                    if (sw.id in data.completions) Icon(Icons.Default.CheckCircle, "Done", tint = AppColors.done)
+                }
+            }
             sessions.forEach { s ->
                 val done = s.id in data.completions
                 Row(
@@ -169,11 +192,11 @@ private fun DayRow(
     }
 }
 
-/** Other sports on a day, shown greyed for context. Planned runs are shown as sessions, so skipped here. */
-fun otherSports(day: DayOfWeek, schedule: com.offseason.engine.AthleteSchedule?, planned: Boolean = false): String {
+/** Other sports on a day, shown greyed for context. Planned runs and swims are shown as sessions, so skipped here. */
+fun otherSports(day: DayOfWeek, schedule: com.offseason.engine.AthleteSchedule?, planned: Boolean = false, swimsPlanned: Boolean = false): String {
     if (schedule == null) return ""
     val parts = mutableListOf<String>()
-    if (day in schedule.swimDays) parts += "Swim"
+    if (day in schedule.swimDays && !swimsPlanned) parts += "Swim"
     if (planned) return parts.joinToString(" · ")
     if (day == schedule.longRunDay) parts += "Long run"
     else if (day in schedule.hardRunDays) parts += "Hard run"
@@ -183,7 +206,7 @@ fun otherSports(day: DayOfWeek, schedule: com.offseason.engine.AthleteSchedule?,
 
 /** Screen 3: whole plan, week by week. */
 @Composable
-fun PlanOverviewScreen(plan: Plan, data: AppData, today: LocalDate, onOpenSession: (String) -> Unit, onOpenRun: (String) -> Unit = {}) {
+fun PlanOverviewScreen(plan: Plan, data: AppData, today: LocalDate, onOpenSession: (String) -> Unit, onOpenRun: (String) -> Unit = {}, onOpenSwim: (String) -> Unit = {}) {
     val current = plan.weekFor(today)?.index ?: 0
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = current)
     val schedule = data.profile?.toPlanRequest()?.schedule
@@ -210,7 +233,8 @@ fun PlanOverviewScreen(plan: Plan, data: AppData, today: LocalDate, onOpenSessio
                             val date = week.startDate.plusDays(i.toLong())
                             val s = week.sessions.firstOrNull { it.date == date }
                             val r = week.runs.firstOrNull { it.date == date }
-                            val other = otherSports(date.dayOfWeek, schedule, planned = plan.request.hasRun)
+                            val sw = week.swims.firstOrNull { it.date == date }
+                            val other = otherSports(date.dayOfWeek, schedule, planned = plan.request.hasRun, swimsPlanned = plan.request.hasSwim)
                             Column(
                                 Modifier.weight(1f)
                                     .background(
@@ -224,13 +248,27 @@ fun PlanOverviewScreen(plan: Plan, data: AppData, today: LocalDate, onOpenSessio
                                 Text(date.dayOfWeek.short().take(2), style = MaterialTheme.typography.labelSmall, color = if (s != null) Color.Black else AppColors.greyedOut)
                                 Text(
                                     when {
-                                        s == null -> if (r == null) other.split(" ").firstOrNull()?.take(4) ?: "" else ""
+                                        s == null -> if (r == null && sw == null) other.split(" ").firstOrNull()?.take(4) ?: "" else ""
                                         s.workout.kind == SessionKind.FTP_TEST -> "TEST"
                                         s.id in data.completions -> "✓"
                                         else -> "${s.workout.durationMin}'"
                                     },
                                     style = MaterialTheme.typography.labelSmall,
                                     color = if (s != null) Color.Black else AppColors.greyedOut,
+                                )
+                                if (sw != null) Text(
+                                    when {
+                                        sw.workout.kind == SwimKind.CSS_TEST -> "CSS"
+                                        sw.id in data.completions -> "S✓"
+                                        else -> "S${sw.workout.distanceM}"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.Black,
+                                    modifier = Modifier
+                                        .padding(top = 2.dp)
+                                        .background(swimKindColor(sw.workout.kind), RoundedCornerShape(4.dp))
+                                        .clickable { onOpenSwim(sw.id) }
+                                        .padding(horizontal = 3.dp),
                                 )
                                 if (r != null) Text(
                                     when {

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -37,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -83,6 +85,14 @@ fun OnboardingScreen(
     var needsTest by rememberSaveable { mutableStateOf(false) }
     var doBike by rememberSaveable { mutableStateOf(true) }
     var doRun by rememberSaveable { mutableStateOf(false) }
+    var doSwim by rememberSaveable { mutableStateOf(false) }
+    var swimsPerWeek by rememberSaveable { mutableIntStateOf(2) }
+    var pool by rememberSaveable { mutableIntStateOf(25) }
+    var canSwim400 by rememberSaveable { mutableStateOf(false) }
+    var swimStartM by rememberSaveable { mutableIntStateOf(0) }
+    var hasRace by rememberSaveable { mutableStateOf(false) }
+    var raceName by rememberSaveable { mutableStateOf("") }
+    var raceDate by remember { mutableStateOf<LocalDate?>(null) }
     var runHours by rememberSaveable { mutableIntStateOf(3) }
     var lthrText by rememberSaveable { mutableStateOf("") }
     var needsLthrTest by rememberSaveable { mutableStateOf(false) }
@@ -102,10 +112,11 @@ fun OnboardingScreen(
     val lthr = lthrText.toIntOrNull()
     val canContinue = when (page) {
         1 -> accepted && READINESS_QUESTIONS.all { it.first in readiness }
-        2 -> name.isNotBlank() && (doBike || doRun) &&
+        2 -> name.isNotBlank() && (doBike || doRun || doSwim) &&
             (!doBike || needsTest || (ftp != null && ftp in 50..600)) &&
             (!doRun || needsLthrTest || (lthr != null && lthr in 100..220))
-        3 -> (!doBike || bikeDays.isNotEmpty()) && (!doRun || runDays.isNotEmpty())
+        3 -> (!doBike || bikeDays.isNotEmpty()) && (!doRun || runDays.isNotEmpty()) && (!doSwim || swimDays.isNotEmpty())
+        4 -> !hasRace || (raceName.isNotBlank() && raceDate != null)
         else -> true
     }
 
@@ -120,17 +131,21 @@ fun OnboardingScreen(
                 1 -> SafetyPage(accepted, { accepted = it }, readiness)
                 2 -> AboutYouPage(
                     name, { name = it }, experience, { experience = it },
-                    doBike, { doBike = it }, doRun, { doRun = it },
+                    doBike, { doBike = it }, doRun, { doRun = it }, doSwim, { doSwim = it },
                     ftpText, { ftpText = it.filter(Char::isDigit).take(3) }, needsTest, { needsTest = it },
                     lthrText, { lthrText = it.filter(Char::isDigit).take(3) }, needsLthrTest, { needsLthrTest = it },
                 )
                 3 -> WeekPage(
-                    doBike, doRun,
+                    doBike, doRun, doSwim, swimsPerWeek, { swimsPerWeek = it }, pool, { pool = it },
+                    canSwim400, { canSwim400 = it }, swimStartM, { swimStartM = it },
                     hours, { hours = it }, runHours, { runHours = it }, bikeDays, { bikeDays = it }, swimDays, { swimDays = it },
                     runDays, { runDays = it; if (longRun !in it) longRun = null; hardRuns = hardRuns intersect it },
                     longRun, { longRun = it }, hardRuns, { hardRuns = it },
                 )
-                4 -> PlanPage(weeks, { weeks = it }, cycle, { cycle = it }, startDate, { startDate = it }, today)
+                4 -> PlanPage(
+                    weeks, { weeks = it }, cycle, { cycle = it }, startDate, { startDate = it }, today,
+                    hasRace, { hasRace = it }, raceName, { raceName = it }, raceDate, { raceDate = it },
+                )
             }
         }
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -157,6 +172,13 @@ fun OnboardingScreen(
                             readiness = readiness.toMap(),
                             runPlan = doRun,
                             runHoursPerWeek = runHours,
+                            swimPlan = doSwim,
+                            swimsPerWeek = swimsPerWeek,
+                            poolLengthM = pool,
+                            swimLevel = if (canSwim400) "CSS" else "BUILD_UP",
+                            swimStartDistanceM = if (canSwim400) 0 else swimStartM,
+                            raceName = if (hasRace) raceName.trim() else null,
+                            raceDate = if (hasRace) raceDate?.toString() else null,
                         ),
                         if (!doBike || needsTest) null else ftp,
                         if (!doRun || needsLthrTest) null else lthr,
@@ -172,14 +194,14 @@ private fun WelcomePage() {
     Image(painterResource(R.drawable.dbap_wordmark), contentDescription = "DBAP", modifier = Modifier.padding(top = 12.dp).width(220.dp))
     Text("Built Different", style = MaterialTheme.typography.titleLarge)
     Text(
-        "A structured winter plan for the bike, the run, or both. Raise your FTP indoors on 3–5 hours a week, and " +
-            "build your running with heart-rate zones, all scheduled around each other and your swimming.",
+        "A structured winter plan for swim, bike and run: pick any or all three. Pool sessions built on your swim pace, " +
+            "indoor bike sessions to raise your FTP, and running by heart-rate zones, all scheduled around each other.",
     )
     SectionCard {
         Text("How it works", fontWeight = FontWeight.SemiBold)
-        Text("1. Choose bike, run or both. Do the tests (or enter recent results): FTP for the bike, LTHR for the run.")
-        Text("2. Tell us your hours and which days you swim, run and ride.")
-        Text("3. Get a plan with exact targets: watts for the bike (download for Zwift, MyWhoosh, ROUVY or TPV) and heart rate for the run.")
+        Text("1. Choose swim, bike, run or all three. Do the tests (or enter recent results): CSS for the swim, FTP for the bike, LTHR for the run. New to swimming? Start on the build-up route instead.")
+        Text("2. Tell us your hours and which days you swim, ride and run.")
+        Text("3. Get a plan with exact targets: pace per 100 m in the pool, watts for the bike (download for Zwift, MyWhoosh, ROUVY or TPV) and heart rate for the run.")
         Text("4. Retest every 4 weeks. Your targets update automatically.")
     }
     SectionCard {
@@ -210,10 +232,7 @@ private fun SafetyPage(accepted: Boolean, onAccept: (Boolean) -> Unit, answers: 
             )
         }
     }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(accepted, onAccept)
-        Text("I've read and accept this")
-    }
+    CheckRow(accepted, onAccept, "I've read and accept this")
 }
 
 @Composable
@@ -222,6 +241,7 @@ private fun AboutYouPage(
     exp: Experience, onExp: (Experience) -> Unit,
     doBike: Boolean, onDoBike: (Boolean) -> Unit,
     doRun: Boolean, onDoRun: (Boolean) -> Unit,
+    doSwim: Boolean, onDoSwim: (Boolean) -> Unit,
     ftpText: String, onFtp: (String) -> Unit,
     needsTest: Boolean, onNeedsTest: (Boolean) -> Unit,
     lthrText: String, onLthr: (String) -> Unit,
@@ -230,13 +250,16 @@ private fun AboutYouPage(
     Text("About you", style = MaterialTheme.typography.headlineSmall)
     OutlinedTextField(name, onName, label = { Text("First name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
     Text("What would you like a plan for?", style = MaterialTheme.typography.titleSmall)
-    ChoiceChips(listOf("Bike" to (doBike && !doRun), "Run" to (doRun && !doBike), "Bike + run" to (doBike && doRun))) {
-        onDoBike(it != 1); onDoRun(it != 0)
+    Muted("Pick one or more.")
+    ChoiceChips(listOf("Swim" to doSwim, "Bike" to doBike, "Run" to doRun)) { i ->
+        when (i) { 0 -> onDoSwim(!doSwim); 1 -> onDoBike(!doBike); else -> onDoRun(!doRun) }
     }
     Muted(
-        if (doBike && doRun) "Both plans are scheduled together, so hard days never land back to back."
-        else if (doRun) "A heart-rate-based run plan. Your bike sessions aren't planned."
-        else "An indoor bike plan to raise your FTP. Your runs aren't planned, but we schedule around them.",
+        when (listOf(doSwim, doBike, doRun).count { it }) {
+            0 -> "Choose at least one sport."
+            1 -> if (doRun) "A heart-rate-based run plan." else if (doSwim) "A pool plan, from building up to 400 m through to race-pace sets." else "An indoor bike plan to raise your FTP."
+            else -> "Your sports are scheduled together, so hard days never land back to back."
+        },
     )
     Text("Training experience", style = MaterialTheme.typography.titleSmall)
     ChoiceChips(listOf("Fairly new to structured training" to (exp == Experience.NEWER), "Experienced" to (exp == Experience.EXPERIENCED))) {
@@ -250,10 +273,7 @@ private fun AboutYouPage(
             lthrText, onLthr, enabled = !needsLthrTest, label = { Text("LTHR (bpm)") }, singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(),
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(needsLthrTest, onNeedsLthrTest)
-            Text("I don't know it. I need to test first.")
-        }
+        CheckRow(needsLthrTest, onNeedsLthrTest, "I don't know it. I need to test first.")
         if (needsLthrTest) Muted("No problem. The run plan starts easy, so do the 30-minute LTHR test in your first week. Until then, run by feel.")
     }
     if (!doBike) return
@@ -264,16 +284,17 @@ private fun AboutYouPage(
         ftpText, onFtp, enabled = !needsTest, label = { Text("FTP (watts)") }, singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(),
     )
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(needsTest, onNeedsTest)
-        Text("I don't know it. I need to test first.")
-    }
+    CheckRow(needsTest, onNeedsTest, "I don't know it. I need to test first.")
     if (needsTest) Muted("No problem. We'll guide you through a 20-minute FTP test as your first session.")
 }
 
 @Composable
 private fun WeekPage(
-    doBike: Boolean, doRun: Boolean,
+    doBike: Boolean, doRun: Boolean, doSwim: Boolean,
+    swimsPerWeek: Int, onSwimsPerWeek: (Int) -> Unit,
+    pool: Int, onPool: (Int) -> Unit,
+    canSwim400: Boolean, onCanSwim400: (Boolean) -> Unit,
+    swimStartM: Int, onSwimStartM: (Int) -> Unit,
     hours: Int, onHours: (Int) -> Unit,
     runHours: Int, onRunHours: (Int) -> Unit,
     bike: Set<DayOfWeek>, onBike: (Set<DayOfWeek>) -> Unit,
@@ -285,8 +306,11 @@ private fun WeekPage(
     val needed = if (hours == 3) 3 else 4
     Text("Your week", style = MaterialTheme.typography.headlineSmall)
     if (doBike) BikeWeek(hours, onHours, bike, onBike, needed)
-    Text("Which days do you swim?", style = MaterialTheme.typography.titleSmall)
-    DayPicker(swim, onSwim)
+    if (doSwim) SwimWeek(swimsPerWeek, onSwimsPerWeek, pool, onPool, canSwim400, onCanSwim400, swimStartM, onSwimStartM, swim, onSwim)
+    else {
+        Text("Which days do you swim?", style = MaterialTheme.typography.titleSmall)
+        DayPicker(swim, onSwim)
+    }
     if (doRun) {
         Text("Run hours per week", style = MaterialTheme.typography.titleSmall)
         ChoiceChips(listOf(2, 3, 4).map { "$it hours" to (runHours == it) }) { onRunHours(it + 2) }
@@ -326,6 +350,32 @@ private fun WeekPage(
 }
 
 @Composable
+private fun SwimWeek(
+    perWeek: Int, onPerWeek: (Int) -> Unit,
+    pool: Int, onPool: (Int) -> Unit,
+    can400: Boolean, onCan400: (Boolean) -> Unit,
+    startM: Int, onStartM: (Int) -> Unit,
+    days: Set<DayOfWeek>, onDays: (Set<DayOfWeek>) -> Unit,
+) {
+    Text("Swims per week", style = MaterialTheme.typography.titleSmall)
+    ChoiceChips(listOf(1, 2, 3).map { "$it" to (perWeek == it) }) { onPerWeek(it + 1) }
+    Text("Which days can you swim?", style = MaterialTheme.typography.titleSmall)
+    DayPicker(days, onDays)
+    if (days.size < perWeek) Muted("Pick $perWeek days, or fewer swims per week.")
+    Text("Pool length", style = MaterialTheme.typography.titleSmall)
+    ChoiceChips(listOf("25 m" to (pool == 25), "50 m" to (pool == 50))) { onPool(if (it == 0) 25 else 50) }
+    Text("Can you swim 400 m front crawl without stopping?", style = MaterialTheme.typography.titleSmall)
+    ChoiceChips(listOf("Yes" to can400, "Not yet" to !can400)) { onCan400(it == 0) }
+    if (can400) Muted("Great. Your plan starts with technique and endurance, and the CSS test sets your paces.")
+    else {
+        Muted("No problem, that's what the build-up plan is for. Short swims with plenty of rest, getting a little longer each week until you can swim 400 m.")
+        Text("Roughly how far can you swim without stopping?", style = MaterialTheme.typography.titleSmall)
+        val options = listOf(0, 50, 100, 200, 300)
+        ChoiceChips(options.map { (if (it == 0) "Not sure" else "$it m") to (startM == it) }) { onStartM(options[it]) }
+    }
+}
+
+@Composable
 private fun BikeWeek(hours: Int, onHours: (Int) -> Unit, bike: Set<DayOfWeek>, onBike: (Set<DayOfWeek>) -> Unit, needed: Int) {
     Text("Bike hours per week", style = MaterialTheme.typography.titleSmall)
     ChoiceChips(listOf(3, 4, 5).map { "$it hours" to (hours == it) }) { onHours(it + 3) }
@@ -348,8 +398,12 @@ private fun PlanPage(
     cycle: RecoveryCycle, onCycle: (RecoveryCycle) -> Unit,
     start: LocalDate, onStart: (LocalDate) -> Unit,
     today: LocalDate,
+    hasRace: Boolean, onHasRace: (Boolean) -> Unit,
+    raceName: String, onRaceName: (String) -> Unit,
+    raceDate: LocalDate?, onRaceDate: (LocalDate) -> Unit,
 ) {
     var picking by remember { mutableStateOf(false) }
+    var pickingRace by remember { mutableStateOf(false) }
     Text("Your plan", style = MaterialTheme.typography.headlineSmall)
     Text("How long?", style = MaterialTheme.typography.titleSmall)
     ChoiceChips(listOf(4, 8, 12, 16).map { "$it weeks" to (weeks == it) }) { onWeeks((it + 1) * 4) }
@@ -388,4 +442,39 @@ private fun PlanPage(
         ) { DatePicker(state) }
     }
     if (start.isBefore(today)) Muted("That date is in the past. The plan will start part-way through.")
+
+    Text("Got a race in the diary?", style = MaterialTheme.typography.titleSmall)
+    CheckRow(hasRace, onHasRace, "Yes, I'm training for a race")
+    if (hasRace) {
+        OutlinedTextField(raceName, onRaceName, label = { Text("Race, e.g. IRONMAN 70.3 Cascais") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedButton(onClick = { pickingRace = true }) {
+            Text(raceDate?.format(DateTimeFormatter.ofPattern("EEEE d MMMM yyyy")) ?: "Choose race date")
+        }
+        Muted("DBAP shows a countdown. This winter plan builds your base; a race-build plan working back from the date is coming later.")
+    }
+    if (pickingRace) {
+        val state = rememberDatePickerState(initialSelectedDateMillis = (raceDate ?: today).toEpochDays().toLong() * 86_400_000L)
+        DatePickerDialog(
+            onDismissRequest = { pickingRace = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { onRaceDate(LocalDate.fromEpochDays((it / 86_400_000L).toInt())) }
+                    pickingRace = false
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { pickingRace = false }) { Text("Cancel") } },
+        ) { DatePicker(state) }
+    }
+}
+
+/** A checkbox with its label; tapping the words ticks it too. */
+@Composable
+private fun CheckRow(checked: Boolean, onChange: (Boolean) -> Unit, label: String) {
+    Row(
+        Modifier.fillMaxWidth().toggleable(checked, onValueChange = onChange, role = Role.Checkbox),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked, onCheckedChange = null, modifier = Modifier.padding(12.dp))
+        Text(label)
+    }
 }
