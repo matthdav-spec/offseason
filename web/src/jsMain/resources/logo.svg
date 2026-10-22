@@ -1,23 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="34 92 444 328" width="444" height="328">
   <defs>
-    <!-- One claw mark: sharp at both ends, widest just above the middle, gently curved. -->
-    <path id="claw" d="M 46,-106 C 38,-46 8,24 -46,106 C -30,30 -2,-40 46,-106 Z"/>
-    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FFE27A"/><stop offset="1" stop-color="#E0A21B"/>
-    </linearGradient>
-    <radialGradient id="red" cx="0.42" cy="0.38" r="0.75">
-      <stop offset="0" stop-color="#F0402F"/><stop offset="1" stop-color="#9E111A"/>
-    </radialGradient>
+    <linearGradient id="gold" gradientUnits="userSpaceOnUse" x1="0" y1="-150" x2="0" y2="150"><stop offset="0" stop-color="#FFE27A"/><stop offset="1" stop-color="#E0A21B"/></linearGradient>
+    <radialGradient id="red" gradientUnits="userSpaceOnUse" cx="-28" cy="-28" r="230"><stop offset="0" stop-color="#F0402F"/><stop offset="1" stop-color="#9E111A"/></radialGradient>
   </defs>
-  <g transform="translate(256,256)">
-    <ellipse rx="222" ry="164" fill="#0B0B0B"/>
-    <ellipse rx="208" ry="150" fill="url(#gold)"/>
-    <ellipse rx="186" ry="128" fill="#0B0B0B"/>
-    <ellipse rx="176" ry="118" fill="url(#red)"/>
-    <g fill="#0B0B0B" stroke="#0B0B0B" stroke-width="10" stroke-linejoin="round">
-      <use href="#claw" transform="translate(-70,6) scale(0.82)"/>
-      <use href="#claw" transform="translate(0,0)"/>
-      <use href="#claw" transform="translate(70,-6) scale(0.82)"/>
-    </g>
+  <g transform="translate(256,256) scale(1.0)">
+    <path d="M-222,0 A222,164 0 1,0 222,0 A222,164 0 1,0 -222,0 Z" fill="#0B0B0B"/>
+    <path d="M-208,0 A208,150 0 1,0 208,0 A208,150 0 1,0 -208,0 Z" fill="url(#gold)"/>
+    <path d="M-186,0 A186,128 0 1,0 186,0 A186,128 0 1,0 -186,0 Z" fill="#0B0B0B"/>
+    <path d="M-176,0 A176,118 0 1,0 176,0 A176,118 0 1,0 -176,0 Z" fill="url(#red)"/>
+    <path d="M0,-58 L24,-64 L52,-86 L82,-112 L92,-78 L100,-44 L114,-18 L134,6 L112,10 L126,34 L100,36 L106,58 L78,62 L52,86 L22,100 L0,104 L-22,100 L-52,86 L-78,62 L-106,58 L-100,36 L-126,34 L-112,10 L-134,6 L-114,-18 L-100,-44 L-92,-78 L-82,-112 L-52,-86 L-24,-64 Z" fill="#0B0B0B"/>
+    <path d="M-30,-62 L-74,-96 L-82,-58 Z" fill="url(#red)"/>
+    <path d="M30,-62 L74,-96 L82,-58 Z" fill="url(#red)"/>
+    <path d="M 0,-40 L 14,-32 L 0,-20 L -14,-32 Z" fill="url(#red)"/>
+    <path d="M -18,-20 Q -52,-40 -80,-36 Q -66,-6 -34,-4 Q -22,-8 -18,-20 Z" fill="#F7C948"/>
+    <path d="M 18,-20 Q 52,-40 80,-36 Q 66,-6 34,-4 Q 22,-8 18,-20 Z" fill="#F7C948"/>
+    <path d="M -52,-30 Q -47,-20 -52,-8 Q -57,-20 -52,-30 Z" fill="#0B0B0B"/>
+    <path d="M 52,-30 Q 57,-20 52,-8 Q 47,-20 52,-30 Z" fill="#0B0B0B"/>
+    <path d="M -16,24 L 16,24 L 0,40 Z" fill="url(#red)"/>
+    <path d="M 0,40 L 0,52 M 0,52 Q -14,66 -32,58 M 0,52 Q 14,66 32,58" fill="none" stroke="url(#red)" stroke-width="6" stroke-linecap="round"/>
+    <path d="M -20,60 L -14,78 L -8,62 Z M 20,60 L 14,78 L 8,62 Z" fill="#F4F1E8"/>
   </g>
 </svg>
