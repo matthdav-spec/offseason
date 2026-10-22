@@ -59,21 +59,24 @@ fun ProgressScreen(
 ) {
     val start = data.startingFtp
     val now = data.currentFtp
-    val due = plan.sessions.filter { !it.optional && !it.date.isAfter(today) }
-    val done = plan.sessions.count { it.id in data.completions }
-    val total = plan.sessions.count { !it.optional }
+    val dueIds = plan.sessions.filter { !it.optional && !it.date.isAfter(today) }.map { it.id } +
+        plan.runs.filter { !it.date.isAfter(today) }.map { it.id }
+    val done = plan.sessions.count { it.id in data.completions } + plan.runs.count { it.id in data.completions }
+    val total = plan.sessions.count { !it.optional } + plan.runs.size
     Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Your progress", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         TrafficLight(status)
 
-        SectionCard {
+        if (plan.request.hasRun) LthrCard(plan, data)
+
+        if (plan.request.hasBike) SectionCard {
             Text("FTP", fontWeight = FontWeight.SemiBold)
             if (start == null || now == null) Text("Do your FTP test to start tracking.")
             else {
                 Text("$now W", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
                 if (now != start) Text("${"%+.1f".format(Ftp.improvementPct(start, now))}% since you started ($start W)")
                 else Text("Your starting point. Your first retest is at the end of week ${plan.weeks.first { it.hasRetest }.index + 1}.")
-                data.profile?.weightKg?.takeIf { data.profile.showWattsPerKg }?.let { Muted("%.2f W/kg".format(now / it)) }
+                data.profile?.let { p -> p.weightKg?.takeIf { p.showWattsPerKg } }?.let { Muted("%.2f W/kg".format(now / it)) }
                 if (data.ftpHistory.size > 1) {
                     HorizontalDivider()
                     data.ftpHistory.sortedBy { it.date }.forEach {
@@ -85,10 +88,10 @@ fun ProgressScreen(
 
         SectionCard {
             Text("Sessions", fontWeight = FontWeight.SemiBold)
-            val doneDue = due.count { it.id in data.completions }
+            val doneDue = dueIds.count { it in data.completions }
             if (completionRate == null) Text("Nothing due yet. Your first session is coming up.")
             else {
-                Text("You've done $doneDue of ${due.size} planned sessions so far (${(completionRate * 100).toInt()}%).")
+                Text("You've done $doneDue of ${dueIds.size} planned sessions so far (${(completionRate * 100).toInt()}%).")
                 LinearProgressIndicator(progress = { completionRate.toFloat() }, modifier = Modifier.fillMaxWidth())
             }
             Muted("$done of $total sessions in the whole plan done.")
@@ -103,13 +106,37 @@ fun ProgressScreen(
             Text(
                 when {
                     last < 1 -> "Your fitness line starts rising as you complete sessions."
-                    last > first -> "Your bike fitness has risen steadily. That's the training adding up."
+                    last > first -> "Your fitness has risen steadily. That's the training adding up."
                     else -> "Your fitness is holding steady."
                 },
             )
             FitnessLine(series.filter { !it.date.isBefore(plan.startDate.minusDays(1)) })
-            Muted("Fitness is a rolling 6-week average of how much training you've done. It rises slowly with consistent riding and dips a little in recovery weeks, which is normal.")
+            Muted("Fitness is a rolling 6-week average of how much training you've done" + (if (plan.request.hasRun && plan.request.hasBike) ", bike and run together" else "") + ". It rises slowly with consistent training and dips a little in recovery weeks, which is normal.")
         }
+    }
+}
+
+@Composable
+private fun LthrCard(plan: Plan, data: AppData) {
+    SectionCard {
+        Text("Run: LTHR", fontWeight = FontWeight.SemiBold)
+        val now = data.currentLthr
+        val start = data.startingLthr
+        if (now == null || start == null) Text("Do the 30-minute LTHR test to set your run zones.")
+        else {
+            Text("$now bpm", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
+            if (now == start) Text("Your starting point. Your next LTHR test is at the end of week ${plan.weeks.firstOrNull { it.hasRunTest }?.let { it.index + 1 } ?: 4}.")
+            else Text("Started at $start bpm.")
+            Muted("LTHR itself doesn't always rise much. The real sign of progress is running faster at the same heart rate, so note your pace on the easy runs.")
+            if (data.lthrHistory.size > 1) {
+                HorizontalDivider()
+                data.lthrHistory.sortedBy { it.date }.forEach {
+                    Row { Text(LocalDate.parse(it.date).format(DateTimeFormatter.ofPattern("d MMM")), Modifier.weight(1f)); Text("${it.lthr} bpm") }
+                }
+            }
+        }
+        val runsDone = plan.runs.count { it.id in data.completions }
+        Muted("$runsDone of ${plan.runs.size} runs done.")
     }
 }
 
@@ -130,12 +157,15 @@ private fun FitnessLine(series: List<Load.DayLoad>) {
     }
 }
 
+private fun canSave(p: Profile) = (!p.bikePlan || p.bikeDays.isNotEmpty()) && (!p.runPlan || p.runDays.isNotEmpty())
+
 /** Screen 8: settings. */
 @Composable
 fun SettingsScreen(
     data: AppData,
     onSaveProfile: (Profile) -> Unit,
     onSaveFtp: (Int) -> Unit,
+    onSaveLthr: (Int) -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
     onReset: () -> Unit,
@@ -149,6 +179,8 @@ fun SettingsScreen(
     var hard by remember(p) { mutableStateOf(p.hardRunDays.map(::dayOfWeekFromIso).toSet()) }
     var longRun by remember(p) { mutableStateOf(p.longRunDay?.let(::dayOfWeekFromIso)) }
     var ftpText by remember(data.currentFtp) { mutableStateOf(data.currentFtp?.toString() ?: "") }
+    var lthrText by remember(data.currentLthr) { mutableStateOf(data.currentLthr?.toString() ?: "") }
+    var runHours by remember(p) { mutableStateOf(p.runHoursPerWeek) }
     var weightText by remember(p) { mutableStateOf(p.weightKg?.toString() ?: "") }
     var wkg by remember(p) { mutableStateOf(p.showWattsPerKg) }
     var confirmReset by remember { mutableStateOf(false) }
@@ -158,8 +190,9 @@ fun SettingsScreen(
         bikeDays = bike.map { it.isoNumber }.sorted(),
         swimDays = swim.map { it.isoNumber }.sorted(),
         runDays = run.map { it.isoNumber }.sorted(),
-        hardRunDays = (hard intersect run).map { it.isoNumber }.sorted(),
+        hardRunDays = if (p.runPlan) emptyList() else (hard intersect run).map { it.isoNumber }.sorted(),
         longRunDay = longRun?.takeIf { it in run }?.isoNumber,
+        runHoursPerWeek = runHours,
         weightKg = weightText.toDoubleOrNull(),
         showWattsPerKg = wkg,
     )
@@ -171,9 +204,25 @@ fun SettingsScreen(
             OutlinedButton(onClick = { onHelp("help/trainer") }, Modifier.fillMaxWidth()) { Text("Get sessions into Zwift, MyWhoosh, ROUVY or TPV") }
             OutlinedButton(onClick = { onHelp("help/feel") }, Modifier.fillMaxWidth()) { Text("Rating sessions & easing off") }
             OutlinedButton(onClick = { onHelp("help/fit") }, Modifier.fillMaxWidth()) { Text("Adding your ride files (.fit)") }
+            if (p.runPlan) OutlinedButton(onClick = { onHelp("help/run") }, Modifier.fillMaxWidth()) { Text("Running by heart rate") }
         }
 
-        SectionCard {
+        if (p.runPlan) SectionCard {
+            Text("LTHR (run)", fontWeight = FontWeight.SemiBold)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    lthrText, { lthrText = it.filter(Char::isDigit).take(3) }, label = { Text("bpm") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f),
+                )
+                Button(
+                    enabled = lthrText.toIntOrNull()?.let { it in 100..220 && it != data.currentLthr } == true,
+                    onClick = { onSaveLthr(lthrText.toInt()) },
+                ) { Text("Update") }
+            }
+            Muted("Use this to correct your LTHR. After a test, use the LTHR test screen instead.")
+        }
+
+        if (p.bikePlan) SectionCard {
             Text("FTP", fontWeight = FontWeight.SemiBold)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
@@ -191,22 +240,27 @@ fun SettingsScreen(
         SectionCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Your week", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                Button(enabled = edited != p && bike.isNotEmpty(), onClick = { onSaveProfile(edited) }) { Text("Save changes") }
+                Button(enabled = edited != p && canSave(edited), onClick = { onSaveProfile(edited) }) { Text("Save changes") }
             }
             Muted("Change anything below, then tap Save changes. Your plan is rebuilt, and sessions you've done stay done.")
-            ChoiceChips(listOf(3, 4, 5).map { "$it h" to (hours == it) }) { hours = it + 3 }
-            Text("Bike days"); DayPicker(bike, { bike = it })
+            if (p.bikePlan) {
+                Text("Bike hours"); ChoiceChips(listOf(3, 4, 5).map { "$it h" to (hours == it) }) { hours = it + 3 }
+                Text("Bike days"); DayPicker(bike, { bike = it })
+            }
             Text("Swim days"); DayPicker(swim, { swim = it })
-            Text("Run days"); DayPicker(run, { run = it })
+            if (p.runPlan) {
+                Text("Run hours"); ChoiceChips(listOf(2, 3, 4).map { "$it h" to (runHours == it) }) { runHours = it + 2 }
+            }
+            Text(if (p.runPlan) "Days you can run" else "Run days"); DayPicker(run, { run = it })
             if (run.isNotEmpty()) {
-                Text("Long run")
+                Text(if (p.runPlan) "Preferred long run day" else "Long run")
                 val runList = run.sorted()
-                ChoiceChips(listOf("None" to (longRun == null)) + runList.map { it.short() to (it == longRun) }) {
+                ChoiceChips(listOf((if (p.runPlan) "Any" else "None") to (longRun == null)) + runList.map { it.short() to (it == longRun) }) {
                     longRun = if (it == 0) null else runList[it - 1]
                 }
-                Text("Hard runs"); DayPicker(hard, { hard = it }, enabled = { it in run })
+                if (!p.runPlan) { Text("Hard runs"); DayPicker(hard, { hard = it }, enabled = { it in run }) }
             }
-            Button(enabled = edited != p && bike.isNotEmpty(), onClick = { onSaveProfile(edited) }, modifier = Modifier.fillMaxWidth()) { Text("Save changes") }
+            Button(enabled = edited != p && canSave(edited), onClick = { onSaveProfile(edited) }, modifier = Modifier.fillMaxWidth()) { Text("Save changes") }
         }
 
         SectionCard {
@@ -243,7 +297,7 @@ fun SettingsScreen(
     if (confirmReset) AlertDialog(
         onDismissRequest = { confirmReset = false },
         title = { Text("Start again?") },
-        text = { Text("This deletes your plan, FTP history and completed sessions from this phone. Export first if you want a backup.") },
+        text = { Text("This deletes your plan, test history and completed sessions from this phone. Export first if you want a backup.") },
         confirmButton = { TextButton(onClick = { confirmReset = false; onReset() }) { Text("Delete everything") } },
         dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Cancel") } },
     )
@@ -253,7 +307,7 @@ fun SettingsScreen(
 fun TrainerHelpScreen() {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Getting sessions onto your trainer", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text("Off-Season creates workout files in two formats: .zwo for Zwift and MyWhoosh, and .mrc for ROUVY and TrainingPeaks Virtual. Targets are a percentage of FTP, so the watts scale to the FTP set in that app. Keep your FTP the same in both places.")
+        Text("DBAP creates workout files in two formats: .zwo for Zwift and MyWhoosh, and .mrc for ROUVY and TrainingPeaks Virtual. Targets are a percentage of FTP, so the watts scale to the FTP set in that app. Keep your FTP the same in both places.")
         SectionCard {
             Text("1. Get the files to your trainer computer", fontWeight = FontWeight.SemiBold)
             Text("For the whole week: tap \"Week's sessions\" on the This Week screen. For one session: open it and tap the button for your app. Email the file to yourself or save it to Google Drive, then open it on the PC, Mac or tablet you ride with. Unzip the week's zip first.")
@@ -283,7 +337,7 @@ fun TrainerHelpScreen() {
 fun FeelHelpScreen() {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Rating sessions & easing off", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text("After each ride, open the session and tap Mark done. Then pick how it felt. This is how Off-Season knows whether the plan suits you.")
+        Text("After each ride, open the session and tap Mark done. Then pick how it felt. This is how DBAP knows whether the plan suits you.")
         SectionCard {
             Text("What to pick", fontWeight = FontWeight.SemiBold)
             Text("Easy: you could have done more.")
@@ -294,7 +348,7 @@ fun FeelHelpScreen() {
         }
         SectionCard {
             Text("When sessions keep feeling too hard", fontWeight = FontWeight.SemiBold)
-            Text("If two interval sessions in a row are rated Hard or Couldn't finish, Off-Season offers three choices:")
+            Text("If two interval sessions in a row are rated Hard or Couldn't finish, DBAP offers three choices:")
             Text("• Lower my targets: every session from tomorrow is ${com.offseason.engine.Adaptation.EASE_PCT}% easier. This lasts until your next FTP test, which sets new targets anyway.")
             Text("• Repeat this week: do this week again before moving on. The rest of the plan, including retests, moves back a week.")
             Text("• No thanks: carry on as planned. Sometimes a hard week is just a hard week.")
@@ -311,11 +365,11 @@ fun FeelHelpScreen() {
 fun FitHelpScreen() {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Adding your ride files (.fit)", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text("This is optional. Every app you ride with saves a .fit file of your ride. Give it to Off-Season and it reads your real power, so your progress and fitness trend are based on what you actually did, not just the plan.")
+        Text("This is optional. Every app you ride with saves a .fit file of your ride. Give it to DBAP and it reads your real power, so your progress and fitness trend are based on what you actually did, not just the plan.")
         SectionCard {
             Text("Two ways to add one", fontWeight = FontWeight.SemiBold)
-            Text("1. Open the session in Off-Season and tap \"Add ride file (.fit)\". Then pick the file from your phone, Google Drive or Downloads.")
-            Text("2. Or find the file in another app (email, WhatsApp, Files or Drive), tap Share, and choose Off-Season. It suggests which session the ride belongs to.")
+            Text("1. Open the session in DBAP and tap \"Add ride file (.fit)\". Then pick the file from your phone, Google Drive or Downloads.")
+            Text("2. Or find the file in another app (email, WhatsApp, Files or Drive), tap Share, and choose DBAP. It suggests which session the ride belongs to.")
             Muted("Zip files from Garmin Connect work too. No need to unzip.")
         }
         SectionCard {
@@ -332,6 +386,37 @@ fun FitHelpScreen() {
             Text("What you'll see", fontWeight = FontWeight.SemiBold)
             Text("The session is marked done, with your time, average and weighted power, and whether you hit the planned effort. For an FTP test, it finds your best 20 minutes and works out your new FTP for you.")
             Muted("If the file has no power data (e.g. a ride without a power meter), the session still counts, using the planned effort.")
+        }
+    }
+}
+
+
+@Composable
+fun RunHelpScreen(lthr: Int?) {
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Running by heart rate", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text("Your run plan uses heart-rate zones based on your LTHR (lactate threshold heart rate). They work on any route, hilly or flat, and adjust to how you are on the day.")
+        SectionCard {
+            Text("Finding your LTHR", fontWeight = FontWeight.SemiBold)
+            Text("Run 30 minutes on your own, as hard as you can hold evenly, like a race. Press LAP at 10 minutes. Your LTHR is the average heart rate of the last 20 minutes. You'll redo it at the end of each 4-week block.")
+        }
+        RunZonesCard(lthr)
+        SectionCard {
+            Text("Tips", fontWeight = FontWeight.SemiBold)
+            Text("• Most of your running is Z1–Z2. It should feel too easy. That's what builds the engine without wrecking your bike sessions.")
+            Text("• Heart rate takes 1–2 minutes to rise at the start of an effort. Ease in rather than sprinting to the number.")
+            Text("• On hills, heat or tired days, slow down to stay in the zone, even if that means walking up a steep hill.")
+            Text("• Strides are too short for heart rate: run them quick and relaxed, by feel.")
+            Text("• A chest strap is more accurate than a wrist sensor, especially for intervals.")
+        }
+        SectionCard {
+            Text("Getting sessions onto your watch", fontWeight = FontWeight.SemiBold)
+            Text("For now, check the session in DBAP before you head out. Most runs are a single easy zone. For quality sessions, set your watch's heart-rate alert to the zone shown, or build the workout in your watch's own app.")
+            Muted("Sending runs straight to Garmin, COROS and others is planned for a later version.")
+        }
+        SectionCard {
+            Text("If something hurts", fontWeight = FontWeight.SemiBold)
+            Text("Tired is normal, pain isn't. If a niggle changes how you run, stop, skip the next run and see a physio if it doesn't settle. The plan will wait.")
         }
     }
 }

@@ -1,4 +1,4 @@
-/* Off-Season web app. Same wintry palette as the Android app. */
+/* DBAP web app. Same wintry palette as the Android app. */
 :root {
     --bg: #0E1A24;
     --surface: #15232F;
@@ -156,3 +156,17 @@ nav.tabs button.on .icon { background: #463F55; }
 hr { border: none; border-top: 1px solid var(--outline); margin: 8px 0; }
 ul { margin: 0; padding-left: 20px; }
 li + li { margin-top: 4px; }
+
+/* Small run marker in the plan grid */
+.runchip { display: inline-block; margin-top: 3px; padding: 0 4px; border-radius: 4px; color: #000; font-size: 11px; cursor: pointer; }
+
+/* Banner on the run-plan preview */
+.preview {
+    background: #F2C14E; color: #1a1400; font-size: 13px; font-weight: 600; text-align: center;
+    padding: calc(env(safe-area-inset-top) + 6px) 12px 6px;
+}
+
+/* Swim set lines: big enough to read at the poolside */
+.swimdist { font-size: 22px; font-weight: 700; letter-spacing: 0.2px; }
+.swimchip { display: inline-block; margin-top: 3px; padding: 0 4px; border-radius: 4px; color: #000; font-size: 11px; cursor: pointer; background: #5BC0BE; }
+.race { background: linear-gradient(90deg, #1D4361, #15232F); }

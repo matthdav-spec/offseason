@@ -122,15 +122,18 @@ fun FtpTestScreen(data: AppData, sessionId: String?) {
 
 @OptIn(ExperimentalComposeWebSvgApi::class)
 @Composable
-fun ProgressScreen(plan: Plan, data: AppData, today: LocalDate, summary: Logic.StatusSummary) {
+fun ProgressScreen(plan: Plan, data: AppData, today: LocalDate, summary: com.offseason.engine.AppLogic.StatusSummary) {
     val start = data.startingFtp
     val now = data.currentFtp
-    val due = plan.sessions.filter { !it.optional && !it.date.isAfter(today) }
+    val dueIds = plan.sessions.filter { !it.optional && !it.date.isAfter(today) }.map { it.id } +
+        plan.runs.filter { !it.date.isAfter(today) }.map { it.id }
     val rate = Logic.completionRate(plan, data, today)
     Div({ classes("app", "stack") }) {
         H1 { Text("Your progress") }
         TrafficLight(summary.message)
-        Card {
+        if (plan.request.hasSwim) SwimProgressCard(plan, data)
+        if (plan.request.hasRun) LthrCard(plan, data)
+        if (plan.request.hasBike) Card {
             Div({ classes("tight") }) {
                 H3 { Text("FTP") }
                 if (start == null || now == null) P { Text("Do your FTP test to start tracking.") }
@@ -138,7 +141,7 @@ fun ProgressScreen(plan: Plan, data: AppData, today: LocalDate, summary: Logic.S
                     P({ style { property("font-size", "40px"); property("color", "var(--primary)") } }) { Text("$now W") }
                     if (now != start) P { Text("${signedOneDp(Ftp.improvementPct(start, now))}% since you started ($start W)") }
                     else P { Text("Your starting point. Your first retest is at the end of week ${plan.weeks.first { it.hasRetest }.index + 1}.") }
-                    data.profile?.weightKg?.takeIf { data.profile.showWattsPerKg }?.let { Muted("${com.offseason.engine.fixed(now / it, 2)} W/kg") }
+                    data.profile?.let { p -> p.weightKg?.takeIf { p.showWattsPerKg } }?.let { Muted("${com.offseason.engine.fixed(now / it, 2)} W/kg") }
                     if (data.ftpHistory.size > 1) {
                         Hr()
                         data.ftpHistory.sortedBy { it.date }.forEach {
@@ -153,10 +156,10 @@ fun ProgressScreen(plan: Plan, data: AppData, today: LocalDate, summary: Logic.S
                 H3 { Text("Sessions") }
                 if (rate == null) P { Text("Nothing due yet. Your first session is coming up.") }
                 else {
-                    P { Text("You've done ${due.count { it.id in data.completions }} of ${due.size} planned sessions so far (${(rate * 100).toInt()}%).") }
+                    P { Text("You've done ${dueIds.count { it in data.completions }} of ${dueIds.size} planned sessions so far (${(rate * 100).toInt()}%).") }
                     Div({ classes("progress") }) { Div({ style { property("width", "${(rate * 100).toInt()}%") } }) }
                 }
-                Muted("${plan.sessions.count { it.id in data.completions }} of ${plan.sessions.count { !it.optional }} sessions in the whole plan done.")
+                Muted("${plan.sessions.count { it.id in data.completions } + plan.runs.count { it.id in data.completions }} of ${plan.sessions.count { !it.optional } + plan.runs.size} sessions in the whole plan done.")
                 val rpes = data.completions.values.groupingBy { it.rpe }.eachCount()
                 if (rpes.isNotEmpty()) Muted("How they felt: " + Rpe.entries.filter { it in rpes }.joinToString(" · ") { "${it.label} ${rpes[it]}" })
             }
@@ -171,7 +174,7 @@ fun ProgressScreen(plan: Plan, data: AppData, today: LocalDate, summary: Logic.S
                     Text(
                         when {
                             last < 1 -> "Your fitness line starts rising as you complete sessions."
-                            last > first -> "Your bike fitness has risen steadily. That's the training adding up."
+                            last > first -> "Your fitness has risen steadily. That's the training adding up."
                             else -> "Your fitness is holding steady."
                         },
                     )
@@ -183,9 +186,32 @@ fun ProgressScreen(plan: Plan, data: AppData, today: LocalDate, summary: Logic.S
                         Polyline(*pts, attrs = { attr("fill", "none"); attr("stroke", "#8CC8F0"); attr("stroke-width", "3"); attr("vector-effect", "non-scaling-stroke") })
                     }
                 }
-                Muted("Fitness is a rolling 6-week average of how much training you've done. It rises slowly with consistent riding and dips a little in recovery weeks, which is normal.")
+                Muted("Fitness is a rolling 6-week average of how much training you've done" + (if (plan.request.hasRun && plan.request.hasBike) ", bike and run together" else "") + ". It rises slowly with consistent training and dips a little in recovery weeks, which is normal.")
             }
         }
+    }
+}
+
+@Composable
+private fun LthrCard(plan: Plan, data: AppData) = Card {
+    Div({ classes("tight") }) {
+        H3 { Text("Run: LTHR") }
+        val now = data.currentLthr
+        val start = data.startingLthr
+        if (now == null || start == null) P { Text("Do the 30-minute LTHR test to set your run zones.") }
+        else {
+            P({ style { property("font-size", "40px"); property("color", "var(--primary)") } }) { Text("$now bpm") }
+            if (now == start) P { Text("Your starting point. Your next LTHR test is at the end of week ${plan.weeks.firstOrNull { it.hasRunTest }?.let { it.index + 1 } ?: 4}.") }
+            else P { Text("Started at $start bpm.") }
+            Muted("LTHR itself doesn't always rise much. The real sign of progress is running faster at the same heart rate, so note your pace on the easy runs.")
+            if (data.lthrHistory.size > 1) {
+                Hr()
+                data.lthrHistory.sortedBy { it.date }.forEach {
+                    Div({ classes("row") }) { Span({ classes("grow") }) { Text(LocalDate.parse(it.date).dayMonth()) }; Text("${it.lthr} bpm") }
+                }
+            }
+        }
+        Muted("${plan.runs.count { it.id in data.completions }} of ${plan.runs.size} runs done.")
     }
 }
 
@@ -201,6 +227,11 @@ fun SettingsScreen(data: AppData) {
     var hard by remember(p) { mutableStateOf(p.hardRunDays.map(::dayOfWeekFromIso).toSet()) }
     var longRun by remember(p) { mutableStateOf(p.longRunDay?.let(::dayOfWeekFromIso)) }
     var ftpText by remember(data.currentFtp) { mutableStateOf(data.currentFtp?.toString() ?: "") }
+    var lthrText by remember(data.currentLthr) { mutableStateOf(data.currentLthr?.toString() ?: "") }
+    var runHours by remember(p) { mutableStateOf(p.runHoursPerWeek) }
+    var swimsPerWeek by remember(p) { mutableStateOf(p.swimsPerWeek) }
+    var pool by remember(p) { mutableStateOf(p.poolLengthM) }
+    val swimming = p.swimPlan
     var weightText by remember(p) { mutableStateOf(p.weightKg?.toString() ?: "") }
     var wkg by remember(p) { mutableStateOf(p.showWattsPerKg) }
     var confirmReset by remember { mutableStateOf(false) }
@@ -210,25 +241,44 @@ fun SettingsScreen(data: AppData) {
         bikeDays = bike.map { it.isoNumber }.sorted(),
         swimDays = swim.map { it.isoNumber }.sorted(),
         runDays = run.map { it.isoNumber }.sorted(),
-        hardRunDays = (hard intersect run).map { it.isoNumber }.sorted(),
+        hardRunDays = if (p.runPlan) emptyList() else (hard intersect run).map { it.isoNumber }.sorted(),
         longRunDay = longRun?.takeIf { it in run }?.isoNumber,
+        runHoursPerWeek = runHours,
+        swimsPerWeek = swimsPerWeek,
+        poolLengthM = pool,
         weightKg = weightText.toDoubleOrNull(),
         showWattsPerKg = wkg,
     )
     fun save() { AppState.update { it.copy(profile = edited) }; AppState.showToast("Plan updated") }
+    val canSave = edited != p && (!edited.bikePlan || edited.bikeDays.isNotEmpty()) && (!edited.runPlan || edited.runDays.isNotEmpty()) &&
+        (!swimming || edited.swimDays.isNotEmpty())
 
     Div({ classes("app", "stack") }) {
         H1 { Text("Settings") }
         Card {
             Div({ classes("tight") }) {
                 H3 { Text("How-to guides") }
-                Btn("Add Off-Season to your Home Screen") { AppState.go(Route.Install) }
+                Btn("Add DBAP to your Home Screen") { AppState.go(Route.Install) }
                 Btn("Get sessions into Zwift, MyWhoosh, ROUVY or TPV") { AppState.go(Route.Help("trainer")) }
                 Btn("Rating sessions & easing off") { AppState.go(Route.Help("feel")) }
                 Btn("Adding your ride files (.fit)") { AppState.go(Route.Help("fit")) }
+                if (p.runPlan) Btn("Running by heart rate") { AppState.go(Route.Help("run")) }
+                if (p.swimPlan) Btn("Swimming with DBAP") { AppState.go(Route.Help("swim")) }
             }
         }
-        Card {
+        if (p.runPlan) Card {
+            Div({ classes("tight") }) {
+                H3 { Text("LTHR (run)") }
+                Div({ classes("row") }) {
+                    Input(InputType.Text) { value(lthrText); attr("inputmode", "numeric"); attr("placeholder", "bpm"); onInput { lthrText = it.value.filter(Char::isDigit).take(3) } }
+                    Btn("Update", "primary auto", enabled = lthrText.toIntOrNull()?.let { it in 100..220 && it != data.currentLthr } == true) {
+                        AppState.recordLthr(lthrText.toInt(), "manual"); AppState.showToast("LTHR updated")
+                    }
+                }
+                Muted("Use this to correct your LTHR. After a test, use the LTHR test screen instead.")
+            }
+        }
+        if (p.bikePlan) Card {
             Div({ classes("tight") }) {
                 H3 { Text("FTP") }
                 Div({ classes("row") }) {
@@ -244,20 +294,27 @@ fun SettingsScreen(data: AppData) {
             Div({ classes("tight") }) {
                 Div({ classes("row") }) {
                     H3({ classes("grow") }) { Text("Your week") }
-                    Btn("Save changes", "primary auto", enabled = edited != p && bike.isNotEmpty()) { save() }
+                    Btn("Save changes", "primary auto", enabled = canSave) { save() }
                 }
                 Muted("Change anything below, then tap Save changes. Your plan is rebuilt, and sessions you've done stay done.")
-                Chips(listOf(3, 4, 5).map { "$it h" to (hours == it) }) { hours = it + 3 }
-                P { Text("Bike days") }; DayPicker(bike, { bike = it })
-                P { Text("Swim days") }; DayPicker(swim, { swim = it })
-                P { Text("Run days") }; DayPicker(run, { run = it })
-                if (run.isNotEmpty()) {
-                    P { Text("Long run") }
-                    val runList = run.sorted()
-                    Chips(listOf("None" to (longRun == null)) + runList.map { it.short() to (it == longRun) }) { longRun = if (it == 0) null else runList[it - 1] }
-                    P { Text("Hard runs") }; DayPicker(hard, { hard = it }, enabled = { it in run })
+                if (p.bikePlan) {
+                    P { Text("Bike hours") }; Chips(listOf(3, 4, 5).map { "$it h" to (hours == it) }) { hours = it + 3 }
+                    P { Text("Bike days") }; DayPicker(bike, { bike = it })
                 }
-                Btn("Save changes", "primary", enabled = edited != p && bike.isNotEmpty()) { save() }
+                P { Text("Swim days") }; DayPicker(swim, { swim = it })
+                if (swimming) {
+                    P { Text("Swims per week") }; Chips(listOf(1, 2, 3).map { "$it" to (swimsPerWeek == it) }) { swimsPerWeek = it + 1 }
+                    P { Text("Pool length") }; Chips(listOf("25 m" to (pool == 25), "50 m" to (pool == 50))) { pool = if (it == 0) 25 else 50 }
+                }
+                if (p.runPlan) { P { Text("Run hours") }; Chips(listOf(2, 3, 4).map { "$it h" to (runHours == it) }) { runHours = it + 2 } }
+                P { Text(if (p.runPlan) "Days you can run" else "Run days") }; DayPicker(run, { run = it })
+                if (run.isNotEmpty()) {
+                    P { Text(if (p.runPlan) "Preferred long run day" else "Long run") }
+                    val runList = run.sorted()
+                    Chips(listOf((if (p.runPlan) "Any" else "None") to (longRun == null)) + runList.map { it.short() to (it == longRun) }) { longRun = if (it == 0) null else runList[it - 1] }
+                    if (!p.runPlan) { P { Text("Hard runs") }; DayPicker(hard, { hard = it }, enabled = { it in run }) }
+                }
+                Btn("Save changes", "primary", enabled = canSave) { save() }
             }
         }
         Card {
@@ -276,7 +333,7 @@ fun SettingsScreen(data: AppData) {
                 H3 { Text("Your data") }
                 Muted("Everything is stored only on this phone, in this browser. Export a backup now and then, or send it to Matt for the pilot.")
                 Div({ classes("footer") }) {
-                    Btn("Export") { Files.shareJson("OffSeason_${p.name}_${AppState.today()}.json", Store.encode(AppState.data)) }
+                    Btn("Export") { Files.shareJson("DBAP_${p.name}_${AppState.today()}.json", Store.encode(AppState.data)) }
                     Btn("Import") {
                         Files.pickFile("") { bytes ->
                             runCatching { Store.decode(bytes.decodeToString()) }
@@ -293,13 +350,13 @@ fun SettingsScreen(data: AppData) {
                 Btn("Reset plan and start again", "danger") { confirmReset = true }
             }
         }
-        Muted("Off-Season web version 0.2.0")
+        Muted("DBAP web version 0.3.0")
     }
 
     if (confirmReset) Div({ classes("overlay"); onClick { confirmReset = false } }) {
         Div({ classes("dialog"); onClick { it.stopPropagation() } }) {
             H3 { Text("Start again?") }
-            P { Text("This deletes your plan, FTP history and completed sessions from this phone. Export first if you want a backup.") }
+            P { Text("This deletes your plan, test history and completed sessions from this phone. Export first if you want a backup.") }
             Btn("Delete everything", "danger") { confirmReset = false; AppState.reset() }
             Btn("Cancel", "text") { confirmReset = false }
         }
@@ -325,15 +382,15 @@ private fun Section(title: String, vararg lines: String, note: String? = null) =
 }
 
 @Composable
-fun InstallGuide() = Guide("Add Off-Season to your Home Screen") {
-    P { Text("Off-Season isn't in the App Store. It's a web app. Add it to your Home Screen once and it opens full screen like any other app, and works without signal.") }
+fun InstallGuide() = Guide("Add DBAP to your Home Screen") {
+    P { Text("DBAP isn't in the App Store. It's a web app. Add it to your Home Screen once and it opens full screen like any other app, and works without signal.") }
     Section(
         "iPhone",
         "1. Open this page in Safari. On iOS 26 and later, Chrome, Edge and other browsers work too.",
         "2. Tap the Share button (the square with an arrow pointing up). In Safari it's at the bottom of the screen, or behind the ⋯ button.",
         "3. Scroll down and tap Add to Home Screen.",
         "4. If you see an \"Open as Web App\" switch, leave it on. Tap Add.",
-        "5. From now on, open Off-Season from its icon, not from the browser.",
+        "5. From now on, open DBAP from its icon, not from the browser.",
         note = "Important: your plan is saved on the Home Screen version. If you set it up in the browser first and then add it to your Home Screen, use Settings › Export in the browser and Import in the Home Screen app.",
     )
     Section(
@@ -349,7 +406,7 @@ fun InstallGuide() = Guide("Add Off-Season to your Home Screen") {
 
 @Composable
 fun TrainerHelp() = Guide("Getting sessions onto your trainer") {
-    P { Text("Off-Season creates workout files in two formats: .zwo for Zwift and MyWhoosh, and .mrc for ROUVY and TrainingPeaks Virtual. Targets are a percentage of FTP, so the watts scale to the FTP set in that app. Keep your FTP the same in both places.") }
+    P { Text("DBAP creates workout files in two formats: .zwo for Zwift and MyWhoosh, and .mrc for ROUVY and TrainingPeaks Virtual. Targets are a percentage of FTP, so the watts scale to the FTP set in that app. Keep your FTP the same in both places.") }
     Section(
         "1. Get the files to your trainer computer",
         "For the whole week: tap \"Week's sessions\" on the This Week screen. For one session: open it and tap the button for your app.",
@@ -365,7 +422,7 @@ fun TrainerHelp() = Guide("Getting sessions onto your trainer") {
 
 @Composable
 fun FeelHelp() = Guide("Rating sessions & easing off") {
-    P { Text("After each ride, open the session and tap Mark done. Then pick how it felt. This is how Off-Season knows whether the plan suits you.") }
+    P { Text("After each ride, open the session and tap Mark done. Then pick how it felt. This is how DBAP knows whether the plan suits you.") }
     Section(
         "What to pick",
         "Easy: you could have done more.",
@@ -376,7 +433,7 @@ fun FeelHelp() = Guide("Rating sessions & easing off") {
     )
     Section(
         "When sessions keep feeling too hard",
-        "If two interval sessions in a row are rated Hard or Couldn't finish, Off-Season offers three choices:",
+        "If two interval sessions in a row are rated Hard or Couldn't finish, DBAP offers three choices:",
         "• Lower my targets: every session from tomorrow is ${Adaptation.EASE_PCT}% easier. This lasts until your next FTP test, which sets new targets anyway.",
         "• Repeat this week: do this week again before moving on. The rest of the plan, including retests, moves back a week.",
         "• No thanks: carry on as planned. Sometimes a hard week is just a hard week.",
@@ -387,10 +444,10 @@ fun FeelHelp() = Guide("Rating sessions & easing off") {
 
 @Composable
 fun FitHelp() = Guide("Adding your ride files (.fit)") {
-    P { Text("This is optional. Every app you ride with saves a .fit file of your ride. Give it to Off-Season and it reads your real power, so your progress and fitness trend are based on what you actually did, not just the plan.") }
+    P { Text("This is optional. Every app you ride with saves a .fit file of your ride. Give it to DBAP and it reads your real power, so your progress and fitness trend are based on what you actually did, not just the plan.") }
     Section(
         "How to add one",
-        "Open the session in Off-Season and tap \"Add ride file (.fit)\". Then pick the file: on iPhone, tap Browse to find it in Files, iCloud Drive or Downloads.",
+        "Open the session in DBAP and tap \"Add ride file (.fit)\". Then pick the file: on iPhone, tap Browse to find it in Files, iCloud Drive or Downloads.",
         "Got the file in Mail or WhatsApp? Save it to Files first (tap it, then Share › Save to Files), then add it as above.",
         note = "Zip files from Garmin Connect work too. No need to unzip.",
     )

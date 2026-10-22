@@ -18,6 +18,8 @@ private val tabs = listOf(
 
 @Composable
 fun App() {
+    if (isDbapPreview) Div({ classes("preview") }) { Text("DBAP preview: swim, bike & run (test version)") }
+    else if (isPreview) Div({ classes("preview") }) { Text("DBAP preview: running plan (test version, separate from your pilot plan)") }
     val data = AppState.data
     val plan = AppState.plan
     if (data.profile == null || plan == null) {
@@ -34,11 +36,17 @@ fun App() {
         Route.Progress -> ProgressScreen(plan, data, today, summary)
         Route.Settings -> SettingsScreen(data)
         is Route.Session -> SessionScreen(plan, data, route.id)
+        is Route.Run -> RunScreen(plan, data, route.id)
+        is Route.LthrTest -> LthrTestScreen(data, route.runId)
+        is Route.Swim -> SwimScreen(plan, data, route.id)
+        is Route.CssTest -> CssTestScreen(data, route.swimId)
         is Route.FtpTest -> FtpTestScreen(data, route.sessionId)
         Route.Install -> InstallGuide()
         is Route.Help -> when (route.topic) {
             "feel" -> FeelHelp()
             "fit" -> FitHelp()
+            "run" -> RunHelp(data.currentLthr)
+            "swim" -> SwimHelp(data.currentCss)
             else -> TrainerHelp()
         }
     }

@@ -29,8 +29,9 @@ object Adaptation {
     }
 
     /**
-     * Scales every power target of sessions on or after [fromDate] by (100 + [pct])%.
-     * FTP tests are never scaled: they measure, they don't train.
+     * Scales every power target of bike sessions on or after [fromDate] by (100 + [pct])%.
+     * FTP tests are never scaled: they measure, they don't train. Runs are heart-rate based, and
+     * heart rate already adjusts to how you are on the day, so runs are left as they are.
      */
     fun applyTargetAdjustment(plan: Plan, fromDate: LocalDate, pct: Int): Plan {
         if (pct == 0) return plan
@@ -88,9 +89,15 @@ object WeekRepeats {
             sessions = w.sessions.map { s ->
                 s.copy(id = idPrefix + s.id, date = s.date.plusDays(days), weekIndex = newIndex)
             },
+            runs = w.runs.map { r ->
+                r.copy(id = idPrefix + r.id, date = r.date.plusDays(days), weekIndex = newIndex)
+            },
+            swims = w.swims.map { s ->
+                s.copy(id = idPrefix + s.id, date = s.date.plusDays(days), weekIndex = newIndex)
+            },
         )
     }
 
-    /** Recovery weeks and weeks with a retest can't be repeated: just carry on. */
-    fun canRepeat(week: PlanWeek): Boolean = !week.isRecovery && !week.hasRetest
+    /** Recovery weeks and weeks with a test can't be repeated: just carry on. */
+    fun canRepeat(week: PlanWeek): Boolean = !week.isRecovery && !week.hasRetest && !week.hasRunTest && !week.hasSwimTest
 }

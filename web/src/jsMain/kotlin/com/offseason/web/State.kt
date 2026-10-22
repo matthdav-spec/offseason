@@ -17,6 +17,10 @@ sealed class Route {
     data object Progress : Route()
     data object Settings : Route()
     data class Session(val id: String) : Route()
+    data class Run(val id: String) : Route()
+    data class LthrTest(val runId: String?) : Route()
+    data class Swim(val id: String) : Route()
+    data class CssTest(val swimId: String?) : Route()
     data class FtpTest(val sessionId: String?) : Route()
     data class Help(val topic: String) : Route()
     data object Install : Route()
@@ -67,20 +71,15 @@ object AppState {
 
     // ---- Actions (same behaviour as the Android app) ----
 
-    fun completeOnboarding(profile: Profile, ftp: Int?) = update {
-        AppData(profile = profile, ftpHistory = ftp?.let { listOf(FtpEntry(today().toString(), it, "entered")) } ?: emptyList())
-    }
-
-    fun recordFtp(ftp: Int, source: String) = update { d ->
-        val date = today().toString()
-        d.copy(ftpHistory = d.ftpHistory.filterNot { it.date == date } + FtpEntry(date, ftp, source), targetAdjustments = emptyList())
-    }
+    fun completeOnboarding(profile: Profile, ftp: Int?, lthr: Int?) = update { Logic.completeOnboarding(profile, ftp, lthr, today()) }
+    fun recordFtp(ftp: Int, source: String) = update { Logic.recordFtp(it, ftp, source, today()) }
+    fun recordLthr(lthr: Int, source: String) = update { Logic.recordLthr(it, lthr, source, today()) }
+    fun recordCss(cssSec: Int, t400: Int?, t200: Int?) = update { Logic.recordCss(it, cssSec, t400, t200, today()) }
+    fun recordSwimDistance(m: Int) = update { Logic.recordSwimDistance(it, m, today()) }
+    fun moveUpToCss() = update { d -> plan?.let { Logic.moveUpToCss(d, it, today()) } ?: d }
 
     fun markDone(id: String, rpe: Rpe) {
-        update { d ->
-            val existing = d.completions[id]
-            d.copy(completions = d.completions + (id to Completion(existing?.date ?: today().toString(), rpe, existing?.ride)))
-        }
+        update { Logic.markDone(it, id, rpe, today()) }
         justRated = id
     }
 
@@ -89,19 +88,16 @@ object AppState {
     fun attachRide(id: String, ride: RideSummary, rpe: Rpe? = null) = update { d ->
         val existing = d.completions[id]
         val date = localDateOfEpochSec(ride.startEpochSec).toString()
-        d.copy(completions = d.completions + (id to Completion(date, rpe ?: existing?.rpe ?: Rpe.ABOUT_RIGHT, Logic.rideStats(ride, d.currentFtp))))
+        d.copy(completions = d.completions + (id to com.offseason.engine.Completion(date, rpe ?: existing?.rpe ?: Rpe.ABOUT_RIGHT, Logic.rideStats(ride, d.currentFtp))))
     }
 
     fun lowerTargets() {
-        update { it.copy(targetAdjustments = it.targetAdjustments + TargetAdjustment(today().plusDays(1).toString(), -com.offseason.engine.Adaptation.EASE_PCT)) }
+        update { Logic.lowerTargets(it, today()) }
         justRated = null
     }
 
     fun repeatWeekOf(id: String) {
-        update { d ->
-            val week = plan?.weeks?.firstOrNull { w -> w.sessions.any { it.id == id } } ?: return@update d
-            if (!WeekRepeats.canRepeat(week)) d else d.copy(repeatedWeeks = d.repeatedWeeks + week.sourceIndex)
-        }
+        update { d -> plan?.let { Logic.repeatWeekOf(d, it, id) } ?: d }
         justRated = null
     }
 

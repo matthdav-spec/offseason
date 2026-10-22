@@ -16,7 +16,7 @@ fun fixed(value: Double, decimals: Int): String {
 
 /** Turns workouts into files that trainer apps can load. */
 object ZwoExporter {
-    const val AUTHOR = "Off-Season"
+    const val AUTHOR = "DBAP"
 
     /** Zwift workout XML. Powers are fractions of FTP, so the file works at any FTP. */
     fun toZwo(workout: Workout): String = buildString {
@@ -65,7 +65,7 @@ object ZwoExporter {
 
     fun weekBundle(week: PlanWeek): ByteArray = zipFiles(weekFiles(week))
 
-    fun weekBundleName(week: PlanWeek) = "OffSeason_week${week.index + 1}_${week.startDate}.zip"
+    fun weekBundleName(week: PlanWeek) = "DBAP_week${week.index + 1}_${week.startDate}.zip"
 }
 
 /**

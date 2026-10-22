@@ -17,6 +17,7 @@ import com.offseason.engine.Step
 import com.offseason.engine.StepType
 import com.offseason.engine.Workout
 import com.offseason.engine.Zone
+import com.offseason.engine.daysTo
 import com.offseason.engine.isAfter
 import com.offseason.engine.isBefore
 import com.offseason.engine.plusDays
@@ -31,10 +32,15 @@ import org.jetbrains.compose.web.dom.Span
 import org.jetbrains.compose.web.dom.Text
 import kotlin.math.roundToInt
 
-fun otherSports(day: DayOfWeek, schedule: AthleteSchedule?): String {
+/**
+ * Other sports on a day, shown greyed for context. Sports the app plans are shown as sessions, so
+ * they're skipped here: [planned] = runs are planned, [swimsPlanned] = swims are planned.
+ */
+fun otherSports(day: DayOfWeek, schedule: AthleteSchedule?, planned: Boolean = false, swimsPlanned: Boolean = false): String {
     if (schedule == null) return ""
     val parts = mutableListOf<String>()
-    if (day in schedule.swimDays) parts += "Swim"
+    if (day in schedule.swimDays && !swimsPlanned) parts += "Swim"
+    if (planned) return parts.joinToString(" · ")
     if (day == schedule.longRunDay) parts += "Long run"
     else if (day in schedule.hardRunDays) parts += "Hard run"
     else if (day in schedule.runDays) parts += "Run"
@@ -47,6 +53,9 @@ fun otherSports(day: DayOfWeek, schedule: AthleteSchedule?): String {
 fun ThisWeekScreen(plan: Plan, data: AppData, today: LocalDate, status: Status.Message) {
     val week = plan.weekFor(today) ?: if (today.isBefore(plan.startDate)) plan.weeks.first() else plan.weeks.last()
     val schedule = data.profile?.toPlanRequest()?.schedule
+    val hasBike = plan.request.hasBike
+    val hasRun = plan.request.hasRun
+    val hasSwim = plan.request.hasSwim
     Div({ classes("app", "stack") }) {
         Div {
             H1 { Text("Hi ${data.profile?.name ?: ""}") }
@@ -58,7 +67,16 @@ fun ThisWeekScreen(plan: Plan, data: AppData, today: LocalDate, status: Status.M
                 },
             )
         }
-        if (data.currentFtp == null) Card {
+        RaceCountdown(data, today)
+        if (Logic.readyToMoveUp(data)) MoveUpCard(plan)
+        if (hasRun && data.currentLthr == null) Card {
+            Div({ classes("tight") }) {
+                H3 { Text("Find your LTHR") }
+                P { Text("Your run zones are based on LTHR. Do the 30-minute test in your first week. Until then, run easy by feel.") }
+                Btn("LTHR test", "primary") { AppState.go(Route.LthrTest(null)) }
+            }
+        }
+        if (hasBike && data.currentFtp == null) Card {
             Div({ classes("tight") }) {
                 H3 { Text("First, find your FTP") }
                 P { Text("Every target in your plan is based on FTP. Do the 20-minute test, then enter your result.") }
@@ -68,7 +86,7 @@ fun ThisWeekScreen(plan: Plan, data: AppData, today: LocalDate, status: Status.M
         TrafficLight(status)
         Div({ classes("row") }) {
             H3({ classes("grow") }) { Text("${week.startDate.shortDay()} – ${week.endDate.shortDay()}") }
-            Btn("⬇ Week's sessions", "auto") { Files.shareWeek(week) }
+            if (hasBike) Btn("⬇ Week's rides", "auto") { Files.shareWeek(week) }
         }
         (0..6).map { week.startDate.plusDays(it) }.forEach { date ->
             val isToday = date == today
@@ -77,15 +95,23 @@ fun ThisWeekScreen(plan: Plan, data: AppData, today: LocalDate, status: Status.M
                     Span({ classes("grow"); if (isToday) style { property("font-weight", "700") } }) {
                         Text((if (isToday) "Today · " else "") + date.shortDay())
                     }
-                    val other = otherSports(date.dayOfWeek, schedule)
-                    if (other.isNotEmpty()) Span({ classes("other") }) { Text(other) }
+                    val o = otherSports(date.dayOfWeek, schedule, planned = hasRun, swimsPlanned = hasSwim)
+                    if (o.isNotEmpty()) Span({ classes("other") }) { Text(o) }
                 }
+                val other = otherSports(date.dayOfWeek, schedule, planned = hasRun, swimsPlanned = hasSwim)
                 val sessions = week.sessions.filter { it.date == date }
-                if (sessions.isEmpty()) Muted("No bike session")
+                val runs = week.runs.filter { it.date == date }
+                val swims = week.swims.filter { it.date == date }
+                val sports = listOf(hasBike, hasRun, hasSwim).count { it }
+                if (sessions.isEmpty() && runs.isEmpty() && swims.isEmpty() && other.isEmpty()) Muted(
+                    if (sports > 1) "Rest day" else if (hasRun) "No run" else if (hasSwim) "No swim" else "No bike session",
+                )
+                swims.forEach { sw -> SwimRow(sw, data) }
                 sessions.forEach { s -> SessionRow(s, data) }
+                runs.forEach { r -> RunRow(r, data) }
             }
         }
-        Muted("Download the sessions, then load them into Zwift, MyWhoosh, ROUVY or TPV. See Settings › How-to guides.")
+        if (hasBike) Muted("Download the rides, then load them into Zwift, MyWhoosh, ROUVY or TPV. See Settings › How-to guides.")
     }
 }
 
@@ -99,6 +125,53 @@ private fun SessionRow(s: PlannedSession, data: AppData) {
         }
         if (s.id in data.completions) Span({ classes("tick") }) { Text("✓") }
         Span({ classes("muted") }) { Text("›") }
+    }
+}
+
+@Composable
+private fun RunRow(r: com.offseason.engine.PlannedRun, data: AppData) {
+    Div({ classes("row", "session"); onClick { AppState.go(Route.Run(r.id)) } }) {
+        Span({ classes("bar"); style { property("background", runKindColor(r.workout.kind)) } })
+        Div({ classes("grow") }) {
+            P({ style { property("font-weight", "600") } }) { Text("Run · " + r.workout.name) }
+            Muted(minutesLabel(r.workout.durationMin) + if (data.currentLthr == null) " · by feel until LTHR test" else "")
+        }
+        if (r.id in data.completions) Span({ classes("tick") }) { Text("✓") }
+        Span({ classes("muted") }) { Text("›") }
+    }
+}
+
+@Composable
+private fun SwimRow(sw: com.offseason.engine.PlannedSwim, data: AppData) {
+    Div({ classes("row", "session"); onClick { AppState.go(Route.Swim(sw.id)) } }) {
+        Span({ classes("bar"); style { property("background", swimKindColor(sw.workout.kind)) } })
+        Div({ classes("grow") }) {
+            P({ style { property("font-weight", "600") } }) { Text("Swim · " + sw.workout.name) }
+            Muted("${sw.workout.distanceM} m · about ${sw.workout.estimatedMin(data.currentCss)} min")
+        }
+        if (sw.id in data.completions) Span({ classes("tick") }) { Text("✓") }
+        Span({ classes("muted") }) { Text("›") }
+    }
+}
+
+/** "IRONMAN 70.3 Cascais · 52 weeks to go" */
+@Composable
+fun RaceCountdown(data: AppData, today: LocalDate) {
+    val p = data.profile ?: return
+    val name = p.raceName ?: return
+    val date = p.raceDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return
+    val days = today.daysTo(date)
+    if (days < 0) return
+    Card("card race") {
+        Div({ classes("row") }) {
+            Div({ classes("grow") }) {
+                P({ style { property("font-weight", "700") } }) { Text(name) }
+                Muted(date.longDay() + " " + date.year)
+            }
+            Span({ classes("right") }) {
+                Text(if (days == 0) "Race day!" else if (days < 14) "$days days to go" else "${days / 7} weeks to go")
+            }
+        }
     }
 }
 
@@ -121,6 +194,8 @@ fun PlanScreen(plan: Plan, data: AppData, today: LocalDate) {
                     (0..6).forEach { i ->
                         val date = week.startDate.plusDays(i)
                         val s = week.sessions.firstOrNull { it.date == date }
+                        val r = week.runs.firstOrNull { it.date == date }
+                        val sw = week.swims.firstOrNull { it.date == date }
                         Div({
                             classes(*(if (s != null) arrayOf("day", "has") else arrayOf("day")))
                             if (s != null) {
@@ -132,10 +207,36 @@ fun PlanScreen(plan: Plan, data: AppData, today: LocalDate) {
                             Div {
                                 Text(
                                     when {
-                                        s == null -> otherSports(date.dayOfWeek, schedule).split(" ").firstOrNull()?.take(4) ?: ""
+                                        s == null -> if (r == null && sw == null) otherSports(date.dayOfWeek, schedule, planned = plan.request.hasRun, swimsPlanned = plan.request.hasSwim).split(" ").firstOrNull()?.take(4) ?: "" else ""
                                         s.workout.kind == SessionKind.FTP_TEST -> "TEST"
                                         s.id in data.completions -> "✓"
                                         else -> "${s.workout.durationMin}'"
+                                    },
+                                )
+                            }
+                            if (sw != null) Span({
+                                classes("swimchip")
+                                style { property("background", swimKindColor(sw.workout.kind)) }
+                                onClick { it.stopPropagation(); AppState.go(Route.Swim(sw.id)) }
+                            }) {
+                                Text(
+                                    when {
+                                        sw.workout.kind == com.offseason.engine.SwimKind.CSS_TEST -> "CSS"
+                                        sw.id in data.completions -> "S✓"
+                                        else -> "S${sw.workout.distanceM}"
+                                    },
+                                )
+                            }
+                            if (r != null) Span({
+                                classes("runchip")
+                                style { property("background", runKindColor(r.workout.kind)) }
+                                onClick { it.stopPropagation(); AppState.go(Route.Run(r.id)) }
+                            }) {
+                                Text(
+                                    when {
+                                        r.workout.kind == com.offseason.engine.RunKind.LTHR_TEST -> "LTHR"
+                                        r.id in data.completions -> "R✓"
+                                        else -> "R${r.workout.durationMin}"
                                     },
                                 )
                             }
@@ -267,7 +368,7 @@ fun SessionScreen(plan: Plan, data: AppData, id: String) {
                         .onFailure { AppState.showToast(it.message ?: "Couldn't read that file.") }
                 }
             }
-            Muted("Adding the .fit file from your ride gives Off-Season your real power, so your progress is more accurate. You don't have to: \"Mark done\" is fine too.")
+            Muted("Adding the .fit file from your ride gives DBAP your real power, so your progress is more accurate. You don't have to: \"Mark done\" is fine too.")
         }
     }
 
@@ -275,7 +376,7 @@ fun SessionScreen(plan: Plan, data: AppData, id: String) {
         Div({ classes("dialog"); onClick { it.stopPropagation() } }) {
             H3 { Text("How did it feel?") }
             Rpe.entries.forEach { r -> Btn(r.label) { AppState.markDone(id, r); askRpe = false } }
-            Muted("Be honest! If sessions keep feeling too hard, Off-Season will offer to ease off.")
+            Muted("Be honest! If sessions keep feeling too hard, DBAP will offer to ease off.")
             Btn("Cancel", "text") { askRpe = false }
         }
     }
@@ -293,8 +394,9 @@ private fun RideResult(ride: RideStats, w: Workout, ftp: Int?) {
         }
         P { Text("Average ${ride.avgPower} W · Weighted ${ride.weightedPower} W") }
         val rideFtp = ride.ftpAtRide ?: ftp
-        if (rideFtp != null && ride.weightedPower != null && w.kind != SessionKind.FTP_TEST) {
-            val pct = ride.weightedPower * 100.0 / (Load.effortScore(w) * rideFtp)
+        val weighted = ride.weightedPower
+        if (rideFtp != null && weighted != null && w.kind != SessionKind.FTP_TEST) {
+            val pct = weighted * 100.0 / (Load.effortScore(w) * rideFtp)
             Muted(
                 when {
                     pct >= 97 -> "Right on target. Nicely done."
