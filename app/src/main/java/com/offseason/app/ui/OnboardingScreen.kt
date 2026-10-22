@@ -1,11 +1,14 @@
 package com.offseason.app.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
@@ -34,9 +37,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.offseason.app.R
 import com.offseason.app.data.Experience
 import com.offseason.app.data.Profile
 import com.offseason.engine.Expectations
@@ -165,6 +170,7 @@ fun OnboardingScreen(
 
 @Composable
 private fun WelcomePage() {
+    Image(painterResource(R.drawable.ic_launcher_foreground), contentDescription = "DBAP logo", modifier = Modifier.size(132.dp).offset(x = (-24).dp))
     Text("DBAP", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
     Text("Turn this winter into a stronger triathlete.", style = MaterialTheme.typography.titleLarge)
     Text(

@@ -331,7 +331,7 @@ fun SettingsScreen(data: AppData) {
         Card {
             Div({ classes("tight") }) {
                 H3 { Text("Your data") }
-                Muted("Everything is stored only on this phone, in this browser. Export a backup now and then, or send it to Matt for the pilot.")
+                Muted("Everything is stored only on this phone, in this browser. Export a backup now and then.")
                 Div({ classes("footer") }) {
                     Btn("Export") { Files.shareJson("DBAP_${p.name}_${AppState.today()}.json", Store.encode(AppState.data)) }
                     Btn("Import") {

@@ -40,7 +40,8 @@ h3 { font-size: 16px; margin: 0; font-weight: 600; }
 p { margin: 0; }
 .muted { color: var(--muted); font-size: 14px; }
 .small { font-size: 13px; }
-.brand { color: var(--primary); font-size: 40px; font-weight: 800; margin: 12px 0 0; }
+.brand { color: var(--primary); font-size: 40px; font-weight: 800; margin: 4px 0 0; }
+.logo { display: block; width: 150px; height: auto; margin: 20px 0 0; }
 .stack > * + * { margin-top: 12px; }
 .tight > * + * { margin-top: 6px; }
 .row { display: flex; align-items: center; gap: 10px; }

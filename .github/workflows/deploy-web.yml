@@ -1,17 +1,14 @@
-# Builds the DBAP web app and publishes it to GitHub Pages.
+# Builds the DBAP web app from main and publishes it to GitHub Pages:
+#   https://matthdav-spec.github.io/offseason/
 #
-#   main      → https://matthdav-spec.github.io/offseason/              (the live pilot)
-#   run-plan  → https://matthdav-spec.github.io/offseason/run-preview/  (running-plan preview)
-#   dbap      → https://matthdav-spec.github.io/offseason/dbap/         (full swim/bike/run preview)
-#
-# GitHub Pages hosts one build per site, so every run builds ALL these branches and publishes them
-# together. A push to either branch updates the site; the other part is rebuilt unchanged.
-# Each branch's engine tests must pass before anything is published.
+# The same build is also published at the two old preview addresses (/dbap/ and /run-preview/) so
+# anyone who added those to their Home Screen keeps working, with their own data, as before.
+# The engine tests must pass before anything is published.
 name: Deploy web app
 
 on:
   push:
-    branches: [main, run-plan, dbap]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -28,17 +25,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: main
-          path: main
-      - uses: actions/checkout@v4
-        with:
-          ref: run-plan
-          path: preview
-      - uses: actions/checkout@v4
-        with:
-          ref: dbap
-          path: dbap
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -48,32 +34,19 @@ jobs:
           node-version: 24
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Test and build the main app
-        working-directory: main
+      - name: Test and build
         run: ./gradlew :engine:jvmTest :web:jsBrowserDistribution
 
-      - name: Test and build the run-plan preview
-        working-directory: preview
-        run: ./gradlew :engine:jvmTest :web:jsBrowserDistribution
-
-      - name: Test and build the DBAP preview
-        working-directory: dbap
-        run: ./gradlew :engine:jvmTest :web:jsBrowserDistribution
-
-      - name: Put them together
+      - name: Put the site together
         run: |
           mkdir site
-          cp -r main/web/build/dist/js/productionExecutable/. site/
-          mkdir site/run-preview
-          cp -r preview/web/build/dist/js/productionExecutable/. site/run-preview/
-          # Give the preview its own offline cache name, so it never clears the main app's cache.
-          sed -i "s/const VERSION = 'offseason-/const VERSION = 'offseason-preview-/" site/run-preview/sw.js
-          # Name the preview differently on the Home Screen.
-          sed -i 's/"name": "DBAP"/"name": "DBAP (run preview)"/; s/"short_name": "DBAP"/"short_name": "DBAP preview"/' site/run-preview/manifest.webmanifest
-          sed -i 's/<meta name="apple-mobile-web-app-title" content="DBAP">/<meta name="apple-mobile-web-app-title" content="DBAP preview">/' site/run-preview/index.html
-          mkdir site/dbap
-          cp -r dbap/web/build/dist/js/productionExecutable/. site/dbap/
-          sed -i "s/const VERSION = 'offseason-/const VERSION = 'offseason-dbap-/" site/dbap/sw.js
+          cp -r web/build/dist/js/productionExecutable/. site/
+          for old in dbap run-preview; do
+            mkdir site/$old
+            cp -r web/build/dist/js/productionExecutable/. site/$old/
+            # Its own offline cache name, so it never clears the main app's cache.
+            sed -i "s/const VERSION = 'offseason-/const VERSION = 'offseason-$old-/" site/$old/sw.js
+          done
 
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -35,18 +35,19 @@ typealias Experience = com.offseason.engine.Experience
 typealias Rpe = com.offseason.engine.Rpe
 typealias RideStats = com.offseason.engine.RideStats
 
-/**
- * True when running from the run-plan preview address (…/offseason/run-preview/). The preview keeps
- * its own data, separate from the main app on the same website, so trying it can't touch a pilot plan.
- */
-val isPreview: Boolean = kotlinx.browser.window.location.pathname.let { it.contains("/run-preview") || it.contains("/dbap") }
-
-/** The full-triathlon DBAP preview (…/offseason/dbap/), as opposed to the running-plan preview. */
-val isDbapPreview: Boolean = kotlinx.browser.window.location.pathname.contains("/dbap")
-
 /** Saves everything in the browser's storage on this phone. Nothing is sent anywhere. */
 object Store {
-    private val KEY = if (isDbapPreview) "dbap.preview.v1" else if (isPreview) "offseason.preview.v1" else "offseason.v1"
+    /**
+     * The same app is also published at the old preview addresses (…/dbap/ and …/run-preview/) so
+     * Home Screen icons added from them keep working. Each address keeps the data it always had.
+     */
+    private val KEY = kotlinx.browser.window.location.pathname.let {
+        when {
+            it.contains("/dbap") -> "dbap.preview.v1"
+            it.contains("/run-preview") -> "offseason.preview.v1"
+            else -> "offseason.v1"
+        }
+    }
 
     fun load(): AppData = runCatching { localStorage.getItem(KEY)?.let(::decode) }.getOrNull() ?: AppData()
     fun save(d: AppData) = localStorage.setItem(KEY, encode(d))

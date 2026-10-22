@@ -20,6 +20,7 @@ import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.H1
 import org.jetbrains.compose.web.dom.H2
+import org.jetbrains.compose.web.dom.Img
 import org.jetbrains.compose.web.dom.H3
 import org.jetbrains.compose.web.dom.Input
 import org.jetbrains.compose.web.dom.Label
@@ -146,20 +147,21 @@ fun Onboarding() {
 
 @Composable
 private fun Welcome() {
+    Img("logo.svg", "DBAP logo", { classes("logo") })
     P({ classes("brand") }) { Text("DBAP") }
     H2 { Text("Turn this winter into a stronger triathlete.") }
     P {
         Text(
-            "A structured winter plan for the bike, the run, or both. Raise your FTP indoors on 3–5 hours a week, and " +
-                "build your running with heart-rate zones, all scheduled around each other and your swimming.",
+            "A structured winter plan for swim, bike and run: pick any or all three. Pool sessions built on your swim pace, " +
+                "indoor bike sessions to raise your FTP, and running by heart-rate zones, all scheduled around each other.",
         )
     }
     Card {
         Div({ classes("tight") }) {
             H3 { Text("How it works") }
-            P { Text("1. Choose bike, run or both. Do the tests (or enter recent results): FTP for the bike, LTHR for the run.") }
-            P { Text("2. Tell us your hours and which days you swim, run and ride.") }
-            P { Text("3. Get a plan with exact targets: watts for the bike (download for Zwift, MyWhoosh, ROUVY or TPV) and heart rate for the run.") }
+            P { Text("1. Choose swim, bike, run or all three. Do the tests (or enter recent results): CSS for the swim, FTP for the bike, LTHR for the run. New to swimming? Start on the build-up route instead.") }
+            P { Text("2. Tell us your hours and which days you swim, ride and run.") }
+            P { Text("3. Get a plan with exact targets: pace per 100 m in the pool, watts for the bike (download for Zwift, MyWhoosh, ROUVY or TPV) and heart rate for the run.") }
             P { Text("4. Retest every 4 weeks. Your targets update automatically.") }
         }
     }

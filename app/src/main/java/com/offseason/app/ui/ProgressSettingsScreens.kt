@@ -278,7 +278,7 @@ fun SettingsScreen(
 
         SectionCard {
             Text("Your data", fontWeight = FontWeight.SemiBold)
-            Muted("Everything is stored only on this phone. Export a backup or send it to Matt for the pilot.")
+            Muted("Everything is stored only on this phone. Export a backup now and then.")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onExport, Modifier.weight(1f)) { Text("Export") }
                 OutlinedButton(onClick = onImport, Modifier.weight(1f)) { Text("Import") }

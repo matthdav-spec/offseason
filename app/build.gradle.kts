@@ -13,8 +13,8 @@ android {
         applicationId = "com.offseason.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "1.0.0"
     }
 
     buildTypes {
@@ -23,8 +23,8 @@ android {
             // Signed with the debug key for now so testers can sideload it. Replace before any Play Store release.
             signingConfig = signingConfigs.getByName("debug")
         }
-        // A test build of unreleased features (e.g. the running plan). It installs ALONGSIDE the
-        // pilot app as "DBAP Preview", with its own data, so testing it can't touch a pilot plan.
+        // A test build of unreleased features. It installs ALONGSIDE the main app as
+        // "DBAP Preview", with its own data, so testing it can't touch a real plan.
         create("preview") {
             initWith(getByName("release"))
             applicationIdSuffix = ".preview"
